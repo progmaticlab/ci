@@ -55,7 +55,7 @@ function catch_errors() {
   trap - ERR EXIT
 
   juju-status-tabular || /bin/true
-  $my_dir/../save-logs.sh
+  $my_dir/save-logs.sh
 
   if [[ "$CLEAN_ENV" == 'always' ]] ; then
     echo "INFO: cleaning environment $(date)"
