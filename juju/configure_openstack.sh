@@ -6,7 +6,6 @@ source "$my_dir/functions"
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 # prepare environment for common openstack functions
-OPENSTACK_VERSION="$VERSION"
 SSH_CMD="juju-ssh"
 export PASSWORD=password
 

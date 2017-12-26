@@ -36,33 +36,33 @@ echo "INFO: network 1: $net3 / $net3_ip"
 # OpenStack base
 
 echo "INFO: Deploy all $(date)"
-juju-deploy cs:$SERIES/ntp
+juju-deploy cs:xenial/ntp
 
-juju-deploy cs:$SERIES/rabbitmq-server --to lxd:$cont0
-juju-deploy cs:$SERIES/percona-cluster mysql --to lxd:$cont0
+juju-deploy cs:xenial/rabbitmq-server --to lxd:$cont0
+juju-deploy cs:xenial/percona-cluster mysql --to lxd:$cont0
 juju-set mysql "root-password=$PASSWORD" "max-connections=1500"
 
-juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
+juju-deploy cs:xenial/openstack-dashboard --to lxd:$cont0
 juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose openstack-dashboard
 
-juju-deploy cs:$SERIES/nova-cloud-controller --to lxd:$cont0
+juju-deploy cs:xenial/nova-cloud-controller --to lxd:$cont0
 juju-set nova-cloud-controller "console-access-protocol=novnc" "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose nova-cloud-controller
 
-juju-deploy cs:$SERIES/glance --to lxd:$cont0
+juju-deploy cs:xenial/glance --to lxd:$cont0
 juju-set glance "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose glance
 
-juju-deploy cs:$SERIES/keystone --to lxd:$cont0
+juju-deploy cs:xenial/keystone --to lxd:$cont0
 juju-set keystone "admin-password=$PASSWORD" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose keystone
 
-juju-deploy cs:$SERIES/nova-compute --to $comp1
+juju-deploy cs:xenial/nova-compute --to $comp1
 juju-add-unit nova-compute --to $comp2
 juju-set nova-compute "openstack-origin=$OPENSTACK_ORIGIN" "virt-type=kvm" "enable-resize=True" "enable-live-migration=True" "migration-auth-type=ssh"
 
-juju-deploy cs:$SERIES/neutron-api --to lxd:$cont0
+juju-deploy cs:xenial/neutron-api --to lxd:$cont0
 juju-set neutron-api "openstack-origin=$OPENSTACK_ORIGIN" "enable-dvr=true" "overlay-network-type=vxlan" "enable-l3ha=True" "neutron-security-groups=True" "flat-network-providers=*" "max-l3-agents-per-router=3"
 juju-set nova-cloud-controller "network-manager=Neutron"
 juju-expose neutron-api
@@ -75,7 +75,7 @@ juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "ha-bindiface=$IF1
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
 
-juju-deploy --series=$SERIES $my_dir/neutron-bgp
+juju-deploy --series=xenial $my_dir/neutron-bgp
 
 echo "INFO: Add relations $(date)"
 juju-add-relation "nova-compute:shared-db" "mysql:shared-db"

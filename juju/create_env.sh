@@ -37,16 +37,6 @@ function run_machine() {
   local ip_ext=$6
 
   local params=""
-  if echo "$name" | grep -q comp ; then
-    params="--memorybacking hugepages=on"
-  fi
-
-  if [[ $SERIES == 'xenial' ]] ; then
-    local osv='ubuntu16.04'
-  else
-    local osv='ubuntu14.04'
-  fi
-
   if [[ -n "$ip_ext" ]] ; then
     params="$params --network network=$nname_ext,model=$net_driver,mac=$mac_base_ext:$mac_suffix"
   fi
@@ -58,7 +48,7 @@ function run_machine() {
     --vcpus $cpu \
     --virt-type kvm \
     --os-type=linux \
-    --os-variant $osv \
+    --os-variant ubuntu16.04 \
     --disk path=$pool_path/$name.qcow2,cache=writeback,bus=virtio,serial=$(uuidgen) \
     --noautoconsole \
     --graphics vnc,listen=0.0.0.0 \
@@ -81,7 +71,7 @@ function wait_kvm_machine() {
   local ip=$1
   local iter=0
   sleep 10
-  while ! $wait_cmd ubuntu@$ip "uname -a" &>/dev/null ; do
+  while ! $wait_cmd $image_user@$ip "uname -a" &>/dev/null ; do
     ((++iter))
     if (( iter > 9 )) ; then
       echo "ERROR: machine $ip is not accessible $(date)"
@@ -96,7 +86,7 @@ run_machine ${job_prefix}-cont 1 2048 $cont_idx $cont_ip
 wait_kvm_machine $cont_ip
 
 echo "INFO: bootstraping juju controller $(date)"
-juju bootstrap manual/$cont_ip $juju_controller_name
+juju bootstrap manual/$image_user@$cont_ip $juju_controller_name
 
 declare -A machines
 
@@ -108,12 +98,13 @@ function run_cloud_machine() {
 
   local ip="$addr.$mac_suffix"
   run_machine ${job_prefix}-os-$name 4 $mem $mac_suffix $ip "$addr_ext.$mac_suffix"
-  machines["$name"]=$ip
   echo "INFO: start machine $name waiting $name $(date)"
   wait_kvm_machine $ip
   echo "INFO: adding machine $name to juju controller $(date)"
-  juju-add-machine ssh:ubuntu@$ip
-  echo "INFO: machine $name is ready $(date)"
+  juju-add-machine ssh:$image_user@$ip
+  mch=`get_machine_by_ip $ip`
+  echo "INFO: machine $name (machine: $mch) is ready $(date)"
+  machines["$name"]=$mch
 }
 
 function run_compute() {
@@ -123,13 +114,14 @@ function run_compute() {
   echo "INFO: creating compute $index (mac suffix $mac_suffix) $(date)"
   local ip="$addr.$mac_suffix"
   run_cloud_machine comp-$index $mac_suffix 4096 $ip
+  mch=`get_machine_by_ip $ip`
 
   echo "INFO: preparing compute $index $(date)"
-  juju-ssh ubuntu@$ip "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
-  juju-scp "$my_dir/files/50-cloud-init-compute-$SERIES.cfg" ubuntu@$ip:50-cloud-init.cfg 2>/dev/null
-  juju-ssh ubuntu@$ip "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh ubuntu@$ip "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
-  juju-ssh ubuntu@$ip "sudo reboot" 2>/dev/null || /bin/true
+  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
+  juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $ip
 }
 
@@ -140,13 +132,14 @@ function run_network() {
   echo "INFO: creating network $index (mac suffix $mac_suffix) $(date)"
   local ip="$addr.$mac_suffix"
   run_cloud_machine net-$index $mac_suffix 4096 $ip
+  mch=`get_machine_by_ip $ip`
 
   echo "INFO: preparing network $index $(date)"
-  juju-ssh ubuntu@$ip "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
-  juju-scp "$my_dir/files/50-cloud-init-compute-$SERIES.cfg" ubuntu@$ip:50-cloud-init.cfg 2>/dev/null
-  juju-ssh ubuntu@$ip "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh ubuntu@$ip "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
-  juju-ssh ubuntu@$ip "sudo reboot" 2>/dev/null || /bin/true
+  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
+  juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $ip
 }
 
@@ -159,17 +152,18 @@ function run_controller() {
   echo "INFO: creating controller $index (mac suffix $mac_suffix) $(date)"
   local ip="$addr.$mac_suffix"
   run_cloud_machine cont-$index $mac_suffix $mem $ip
+  mch=`get_machine_by_ip $ip`
 
   echo "INFO: preparing controller $index $(date)"
-  juju-ssh ubuntu@$ip "sudo apt-get -fy install mc wget bridge-utils" &>>$log_dir/apt.log
+  juju-ssh $mch "sudo apt-get -fy install mc wget bridge-utils" &>>$log_dir/apt.log
   if [[ "$prepare_for_openstack" == '1' ]]; then
-    juju-ssh ubuntu@$ip "sudo sed -i -e 's/^USE_LXD_BRIDGE.*$/USE_LXD_BRIDGE=\"false\"/m' /etc/default/lxd-bridge" 2>/dev/null
-    juju-ssh ubuntu@$ip "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-$IF1\"/m' /etc/default/lxd-bridge" 2>/dev/null
+    juju-ssh $mch "sudo sed -i -e 's/^USE_LXD_BRIDGE.*$/USE_LXD_BRIDGE=\"false\"/m' /etc/default/lxd-bridge" 2>/dev/null
+    juju-ssh $mch "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-$IF1\"/m' /etc/default/lxd-bridge" 2>/dev/null
   fi
-  juju-scp "$my_dir/files/50-cloud-init-controller-$SERIES.cfg" ubuntu@$ip:50-cloud-init.cfg 2>/dev/null
-  juju-ssh ubuntu@$ip "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh ubuntu@$ip "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
-  juju-ssh ubuntu@$ip "sudo reboot" 2>/dev/null || /bin/true
+  juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $ip
 }
 
@@ -192,11 +186,11 @@ done
 cat $WORKSPACE/hosts
 echo "INFO: Applying hosts file and hostnames $(date)"
 for m in ${!machines[@]} ; do
-  ip=${machines[$m]}
+  mch=${machines[$m]}
   echo "INFO: Apply $m for $ip"
-  juju-scp $WORKSPACE/hosts ubuntu@$ip:hosts
-  juju-ssh ubuntu@$ip "sudo bash -c 'echo $m > /etc/hostname ; hostname $m'" 2>/dev/null
-  juju-ssh ubuntu@$ip 'sudo bash -c "cat ./hosts >> /etc/hosts"' 2>/dev/null
+  juju-scp $WORKSPACE/hosts $mch:hosts
+  juju-ssh $mch "sudo bash -c 'echo $m > /etc/hostname ; hostname $m'" 2>/dev/null
+  juju-ssh $mch 'sudo bash -c "cat ./hosts >> /etc/hosts"' 2>/dev/null
 done
 rm $WORKSPACE/hosts
 

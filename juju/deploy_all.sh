@@ -30,13 +30,10 @@ if [[ "$jver" == 1 ]] ; then
   exit 1
 fi
 
-# next step tested only with xenial
-export SERIES="xenial"
-export VERSION="${VERSION:-ocata}"
-export OPENSTACK_ORIGIN="cloud:$SERIES-$VERSION"
-
+# next step tested only with xenial/ocata
+export OPENSTACK_ORIGIN="cloud:xenial-ocata"
 export PASSWORD=${PASSWORD:-'password'}
-# interface do ubuntu
+# interface for ubuntu
 export IF1='ens3'
 export IF2='ens4'
 
