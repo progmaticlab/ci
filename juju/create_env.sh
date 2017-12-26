@@ -21,7 +21,6 @@ if $virsh_cmd list --all | grep -q "${job_prefix}-cont" ; then
 fi
 
 create_network $nname $addr
-create_network $nname_ext $addr_ext
 
 # create pool
 $virsh_cmd pool-info $poolname &> /dev/null || create_pool $poolname
@@ -33,13 +32,6 @@ function run_machine() {
   local ram="$3"
   local mac_suffix="$4"
   local ip=$5
-  # optional params
-  local ip_ext=$6
-
-  local params=""
-  if [[ -n "$ip_ext" ]] ; then
-    params="$params --network network=$nname_ext,model=$net_driver,mac=$mac_base_ext:$mac_suffix"
-  fi
 
   echo "INFO: running machine $name $(date)"
   cp $BASE_IMAGE $pool_path/$name.qcow2
@@ -55,13 +47,9 @@ function run_machine() {
     --network network=$nname,model=$net_driver,mac=$mac_base:$mac_suffix \
     --cpu SandyBridge,+vmx,+ssse3 \
     --boot hd \
-    $params \
     --dry-run --print-xml > /tmp/oc-$name.xml
   virsh define --file /tmp/oc-$name.xml
   virsh net-update $nname add ip-dhcp-host "<host mac='$mac_base:$mac_suffix' name='$name' ip='$ip' />"
-  if [[ -n "$ip_ext" ]] ; then
-    virsh net-update $nname_ext add ip-dhcp-host "<host mac='$mac_base_ext:$mac_suffix' name='$name' ip='$ip_ext' />"
-  fi
   virsh start $name --force-boot
   echo "INFO: machine $name run $(date)"
 }
@@ -97,13 +85,15 @@ function run_cloud_machine() {
   local ip=$4
 
   local ip="$addr.$mac_suffix"
-  run_machine ${job_prefix}-os-$name 4 $mem $mac_suffix $ip "$addr_ext.$mac_suffix"
+  run_machine ${job_prefix}-os-$name 4 $mem $mac_suffix $ip
   echo "INFO: start machine $name waiting $name $(date)"
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
   juju-add-machine ssh:$image_user@$ip
   mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
+  # after first boot we must remove cloud-init
+  juju ssh $mch "rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
   echo "INFO: machine $name (machine: $mch) is ready $(date)"
   machines["$name"]=$mch
 }

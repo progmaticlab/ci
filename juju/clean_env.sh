@@ -16,7 +16,6 @@ if juju show-controller $juju_controller_name ; then
 fi
 
 delete_network $nname
-delete_network $nname_ext
 
 delete_domains
 
