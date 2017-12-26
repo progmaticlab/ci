@@ -66,15 +66,15 @@ function run_machine() {
   echo "INFO: machine $name run $(date)"
 }
 
-wait_cmd="ssh"
 function wait_kvm_machine() {
-  local ip=$1
+  local dest=$1
+  local wait_cmd=${2:-ssh}
   local iter=0
   sleep 10
-  while ! $wait_cmd $image_user@$ip "uname -a" &>/dev/null ; do
+  while ! $wait_cmd $dest "uname -a" &>/dev/null ; do
     ((++iter))
     if (( iter > 9 )) ; then
-      echo "ERROR: machine $ip is not accessible $(date)"
+      echo "ERROR: machine $dest is not accessible $(date)"
       exit 2
     fi
     sleep 10
@@ -83,7 +83,7 @@ function wait_kvm_machine() {
 
 cont_ip="$addr.$cont_idx"
 run_machine ${job_prefix}-cont 1 2048 $cont_idx $cont_ip
-wait_kvm_machine $cont_ip
+wait_kvm_machine $image_user@$cont_ip
 
 echo "INFO: bootstraping juju controller $(date)"
 juju bootstrap manual/$image_user@$cont_ip $juju_controller_name
@@ -99,10 +99,11 @@ function run_cloud_machine() {
   local ip="$addr.$mac_suffix"
   run_machine ${job_prefix}-os-$name 4 $mem $mac_suffix $ip "$addr_ext.$mac_suffix"
   echo "INFO: start machine $name waiting $name $(date)"
-  wait_kvm_machine $ip
+  wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
   juju-add-machine ssh:$image_user@$ip
   mch=`get_machine_by_ip $ip`
+  wait_kvm_machine $mch juju-ssh
   echo "INFO: machine $name (machine: $mch) is ready $(date)"
   machines["$name"]=$mch
 }
@@ -122,7 +123,7 @@ function run_compute() {
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $ip
+  wait_kvm_machine $mch juju-ssh
 }
 
 function run_network() {
@@ -140,7 +141,7 @@ function run_network() {
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $ip
+  wait_kvm_machine $mch juju-ssh
 }
 
 function run_controller() {
@@ -164,7 +165,7 @@ function run_controller() {
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $ip
+  wait_kvm_machine $mch juju-ssh
 }
 
 run_controller 0 8192 1
