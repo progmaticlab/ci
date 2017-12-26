@@ -88,7 +88,7 @@ function run_cloud_machine() {
   local ip=$4
 
   local ip="$network_addr.$mac_suffix"
-  run_machine ${job_prefix}-$name 4 $mem $mac_suffix $ip
+  run_machine $name 4 $mem $mac_suffix $ip
   echo "INFO: start machine $name waiting $name $(date)"
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
