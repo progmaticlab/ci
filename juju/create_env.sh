@@ -45,7 +45,6 @@ function run_machine() {
     --noautoconsole \
     --graphics vnc,listen=0.0.0.0 \
     --network network=$nname,model=$net_driver,mac=$mac_base:$mac_suffix \
-    --cpu SandyBridge,+vmx,+ssse3 \
     --boot hd \
     --dry-run --print-xml > /tmp/oc-$name.xml
   virsh define --file /tmp/oc-$name.xml
@@ -93,7 +92,7 @@ function run_cloud_machine() {
   mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
   # after first boot we must remove cloud-init
-  juju ssh $mch "rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
+  juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
   echo "INFO: machine $name (machine: $mch) is ready $(date)"
   machines["$name"]=$mch
 }
