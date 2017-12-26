@@ -42,6 +42,7 @@ function run_machine() {
   virt-install --name $name \
     --ram $ram \
     --vcpus $cpu \
+    --cpu host \
     --virt-type kvm \
     --os-type=linux \
     --os-variant ubuntu16.04 \
