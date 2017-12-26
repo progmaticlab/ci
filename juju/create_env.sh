@@ -5,6 +5,10 @@ my_dir="$(dirname $my_file)"
 
 source "$my_dir/functions"
 
+# prepared image parameters
+image_user="root"
+base_image="/var/lib/libvirt/images/ubuntu-xenial.qcow2"
+
 trap 'catch_errors_ce $LINENO' ERR EXIT
 function catch_errors_ce() {
   local exit_code=$?
@@ -14,16 +18,16 @@ function catch_errors_ce() {
 }
 
 # check if environment is present
-if $virsh_cmd list --all | grep -q "${job_prefix}-cont" ; then
+if virsh list --all | grep -q "${job_prefix}-cont" ; then
   echo 'ERROR: environment present. please clean up first'
-  $virsh_cmd list --all | grep "${job_prefix}-"
+  virsh list --all | grep "${job_prefix}-"
   exit 1
 fi
 
-create_network $nname $addr
+create_network $network_name $network_addr
 
 # create pool
-$virsh_cmd pool-info $poolname &> /dev/null || create_pool $poolname
+virsh pool-info $poolname &> /dev/null || create_pool $poolname
 pool_path=$(get_pool_path $poolname)
 
 function run_machine() {
@@ -34,7 +38,7 @@ function run_machine() {
   local ip=$5
 
   echo "INFO: running machine $name $(date)"
-  cp $BASE_IMAGE $pool_path/$name.qcow2
+  cp "$base_image" $pool_path/$name.qcow2
   virt-install --name $name \
     --ram $ram \
     --vcpus $cpu \
@@ -44,11 +48,11 @@ function run_machine() {
     --disk path=$pool_path/$name.qcow2,cache=writeback,bus=virtio,serial=$(uuidgen) \
     --noautoconsole \
     --graphics vnc,listen=0.0.0.0 \
-    --network network=$nname,model=$net_driver,mac=$mac_base:$mac_suffix \
+    --network network=$network_name,model=e1000,mac=$mac_base:$mac_suffix \
     --boot hd \
     --dry-run --print-xml > /tmp/oc-$name.xml
   virsh define --file /tmp/oc-$name.xml
-  virsh net-update $nname add ip-dhcp-host "<host mac='$mac_base:$mac_suffix' name='$name' ip='$ip' />"
+  virsh net-update $network_name add ip-dhcp-host "<host mac='$mac_base:$mac_suffix' name='$name' ip='$ip' />"
   virsh start $name --force-boot
   echo "INFO: machine $name run $(date)"
 }
@@ -68,7 +72,7 @@ function wait_kvm_machine() {
   done
 }
 
-cont_ip="$addr.$cont_idx"
+cont_ip="$network_addr.$cont_idx"
 run_machine ${job_prefix}-cont 1 2048 $cont_idx $cont_ip
 wait_kvm_machine $image_user@$cont_ip
 
@@ -83,18 +87,18 @@ function run_cloud_machine() {
   local mem=$3
   local ip=$4
 
-  local ip="$addr.$mac_suffix"
+  local ip="$network_addr.$mac_suffix"
   run_machine ${job_prefix}-os-$name 4 $mem $mac_suffix $ip
   echo "INFO: start machine $name waiting $name $(date)"
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
   juju-add-machine ssh:$image_user@$ip
+  machines["$name"]=$ip
   mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
   # after first boot we must remove cloud-init
   juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
   echo "INFO: machine $name (machine: $mch) is ready $(date)"
-  machines["$name"]=$mch
 }
 
 function run_compute() {
@@ -102,7 +106,7 @@ function run_compute() {
   local mac_var_name="os_comp_${index}_idx"
   local mac_suffix=${!mac_var_name}
   echo "INFO: creating compute $index (mac suffix $mac_suffix) $(date)"
-  local ip="$addr.$mac_suffix"
+  local ip="$network_addr.$mac_suffix"
   run_cloud_machine comp-$index $mac_suffix 4096 $ip
   mch=`get_machine_by_ip $ip`
 
@@ -110,7 +114,7 @@ function run_compute() {
   juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
   juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $mch juju-ssh
 }
@@ -120,7 +124,7 @@ function run_network() {
   local mac_var_name="os_net_${index}_idx"
   local mac_suffix=${!mac_var_name}
   echo "INFO: creating network $index (mac suffix $mac_suffix) $(date)"
-  local ip="$addr.$mac_suffix"
+  local ip="$network_addr.$mac_suffix"
   run_cloud_machine net-$index $mac_suffix 4096 $ip
   mch=`get_machine_by_ip $ip`
 
@@ -128,7 +132,7 @@ function run_network() {
   juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
   juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $mch juju-ssh
 }
@@ -140,7 +144,7 @@ function run_controller() {
   local mac_var_name="os_cont_${index}_idx"
   local mac_suffix=${!mac_var_name}
   echo "INFO: creating controller $index (mac suffix $mac_suffix) $(date)"
-  local ip="$addr.$mac_suffix"
+  local ip="$network_addr.$mac_suffix"
   run_cloud_machine cont-$index $mac_suffix $mem $ip
   mch=`get_machine_by_ip $ip`
 
@@ -152,7 +156,7 @@ function run_controller() {
   fi
   juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh $mch "echo 'supersede routers $addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
   wait_kvm_machine $mch juju-ssh
 }
@@ -176,7 +180,8 @@ done
 cat $WORKSPACE/hosts
 echo "INFO: Applying hosts file and hostnames $(date)"
 for m in ${!machines[@]} ; do
-  mch=${machines[$m]}
+  ip=${machines[$m]}
+  mch=`get_machine_by_ip $ip`
   echo "INFO: Apply $m for $ip"
   juju-scp $WORKSPACE/hosts $mch:hosts
   juju-ssh $mch "sudo bash -c 'echo $m > /etc/hostname ; hostname $m'" 2>/dev/null
@@ -186,6 +191,6 @@ rm $WORKSPACE/hosts
 
 echo "INFO: Environment created $(date)"
 
-virsh net-dhcp-leases $nname
+virsh net-dhcp-leases $network_name
 
 trap - ERR EXIT

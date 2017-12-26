@@ -41,7 +41,7 @@ openstack image create --public --file cirros-0.3.5-x86_64-disk.img cirros
 # BGP
 openstack bgp speaker create --local-as 65433 --no-advertise-tenant-networks bgpspeaker
 openstack bgp speaker add network bgpspeaker public
-openstack bgp peer create --remote-as 65432 --peer-ip $addr.1 kvm
+openstack bgp peer create --remote-as 65432 --peer-ip $network_addr.1 kvm
 openstack bgp speaker add peer bgpspeaker kvm
 for iii in `openstack network agent list | grep BGP | awk '{print $2}'` ; do openstack bgp dragent add speaker $iii bgpspeaker ; done
 

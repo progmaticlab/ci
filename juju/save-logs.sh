@@ -21,11 +21,27 @@ for unit in `timeout -s 9 30 juju status $juju_model_arg --format oneline | awk 
   juju show-status-log $juju_model_arg --days 1 $unit >> $log_dir/juju_unit_statuses.log
 done
 
+slf=$(mktemp)
+cat <<EOS >$slf
+rm -f logs.*
+tar -cf logs.tar /var/log/juju 2>/dev/null
+for ldir in '/etc/apache2' '/etc/apt' '/etc/neutron' '/etc/nova' '/etc/haproxy' '/var/log/upstart' '/var/log/neutron' '/var/log/nova' '/etc/keystone' '/var/log/keystone' ; do
+  if [ -d "$ldir" ] ; then
+    tar -rf logs.tar "$ldir" 2>/dev/null
+  fi
+done
+ps ax -H &> ps.log
+netstat -lpn &> netstat.log
+free -h &> mem.log
+tar -rf logs.tar ps.log netstat.log mem.log 2>/dev/null
+gzip logs.tar
+EOS
+
 for mch in $(juju-machines-tabular | awk '/started/{print $1}') ; do
   mkdir -p "$log_dir/$mch"
   juju-ssh $mch "df -hT" &>"$log_dir/$mch/df.log"
-  juju-scp "$my_dir/__save-logs.sh" $mch:save_logs.sh 2>/dev/null
-  juju-ssh $mch "sudo ./save_logs.sh" 2>/dev/null
+  juju-scp "$slf" $mch:save_logs.sh 2>/dev/null
+  juju-ssh $mch "sudo bash ./save_logs.sh" 2>/dev/null
   rm -f logs.tar.gz
   juju-scp $mch:logs.tar.gz logs.tar.gz 2>/dev/null
   cdir=`pwd`

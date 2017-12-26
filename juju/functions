@@ -2,6 +2,182 @@
 
 fomy_file="${BASH_SOURCE[0]}"
 fomy_dir="$(dirname $fomy_file)"
-source $fomy_dir/definitions
+
+job_prefix="jovs"
+juju_controller_name="${job_prefix}-cloud"
+juju_model_arg="-m ${juju_controller_name}:default"
+
+poolname="${job_prefix}images"
+network_name="$job_prefix"
+# bird daemon configured to this CIDR/DHCP-range on KVM
+network_addr="10.0.0"
+dhcp_start="$network_addr.100"
+dhcp_end="$network_addr.129"
+
+mac_base='52:54:00:10:00'
+# juju controller
+cont_idx='99'
+# openstack components (controllers + rabbit + db)
+os_cont_0_idx='10'
+# network nodes
+os_net_1_idx='20'
+os_net_2_idx='21'
+os_net_3_idx='22'
+# openstack compute
+os_comp_1_idx='30'
+os_comp_2_idx='31'
+
+# openstack definitions
+public_network_addr="10.10.0"
+# Neutron
+brex_iface='br-ex'
+brex_port='dummy0'
+
+# definitions for KVM/virsh:
+export LIBVIRT_DEFAULT_URI=qemu:///system
+
+# Juju helpers
 source $fomy_dir/common/functions
-source $fomy_dir/common/functions-bmc
+
+# KVM helpers
+
+function delete_network() {
+  local network_name="$1"
+  virsh net-destroy $network_name 2> /dev/null || true
+  virsh net-undefine $network_name 2> /dev/null || true
+}
+
+function create_network() {
+  local network_name="$1"
+  local addr="$2"
+
+  delete_network $network_name
+
+  echo "<network><name>$network_name</name><forward mode=\"nat\"><nat><port start=\"1024\" end=\"65535\"/></nat></forward><ip address=\"$network_addr.1\" netmask=\"255.255.255.0\"><dhcp><range start=\"$dhcp_start\" end=\"$dhcp_end\"/></dhcp></ip></network>" > /tmp/juju-net.xml
+  virsh net-define /tmp/juju-net.xml
+  rm /tmp/juju-net.xml
+  virsh net-autostart $network_name
+  virsh -c qemu:///system net-start $network_name
+}
+
+function create_pool() {
+  local poolname="$1"
+  local path="$HOME/libvirt/$poolname"
+  # pre-create path if absent to save ownership
+  mkdir -p "$path"
+  virsh pool-define-as $poolname dir - - - - "$path"
+  virsh pool-build $poolname
+  virsh pool-start $poolname
+  virsh pool-autostart $poolname
+}
+
+function delete_pool() {
+  local poolname="$1"
+  local path=`get_pool_path $poolname`
+  virsh pool-destroy $poolname
+  virsh pool-undefine $poolname
+  rm -rf "$poolpath" || /bin/true
+}
+
+function get_pool_path() {
+  local poolname=$1
+  virsh pool-info $poolname &>/dev/null || return
+  virsh pool-dumpxml $poolname | sed -n '/path/{s/.*<path>\(.*\)<\/path>.*/\1/;p}'
+}
+
+function delete_domains() {
+  for name in `virsh list --all | grep "${job_prefix}-" | awk '{print $2}'` ; do
+    virsh destroy $name || /bin/true
+    sleep 2
+    virsh undefine $name || /bin/true
+  done
+}
+
+function delete_volume() {
+  volname=$1
+  poolname=$2
+  pool_path=$(get_pool_path $poolname)
+  virsh vol-delete $volname --pool $poolname 2>/dev/null || rm -f $pool_path/$volname 2>/dev/null
+}
+
+# deployment specific steps
+
+function configure_l3_routing() {
+  # configures compute/network node for 'disconnected' DVR/HA scheme
+  local mch=$1
+
+  # enable forwarding
+  juju-ssh $mch "sudo sysctl -w net.ipv4.ip_forward=1"
+  # assign gateway of public network to br-ex (OVSBridge)
+  juju-ssh $mch "sudo ip link set up dev $brex_iface ; sudo ip addr add $public_network_addr.1/32 broadcast $public_network_addr.1 dev $brex_iface"
+  # add route for public CIDR to virtual zone
+  juju-ssh $mch "sudo ip route add $public_network_addr.0/24 dev $brex_iface"
+  # add route for all traffic from virtual zone to host's default gateway
+  juju-ssh $mch "sudo ip rule add from all iif $brex_iface pref 10 table 120 ; sudo ip route add 0.0.0.0/0 table 120 via $network_addr.1 dev $IF1"
+
+  # copy & install neutron_router_helper
+  tmpf=$(mktemp)
+  cp $my_dir/files/neutron-router-helper.yaml $tmpf
+  sed -i -e "s/{{public_iface}}/$brex_iface/g" $tmpf
+  sed -i -e "s|{{public_cidr}}|$public_network_addr.0/24|g" $tmpf
+  sed -i -e "s/{{public_gateway}}/$public_network_addr.1/g" $tmpf
+  juju-scp $HOME/neutron-router-helper.tgz $mch:
+  juju-scp $tmpf $mch:neutron-router-helper.yaml
+  juju-ssh $mch "tar -xf neutron-router-helper.tgz ; cd neutron-router-helper-master ; sudo PBR_VERSION='0.1.0' python setup.py install --install-scripts=/usr/local/bin &>/dev/null"
+  juju-ssh $mch "sudo mv neutron-router-helper.yaml /etc/neutron/neutron-router-helper.yaml"
+  juju-ssh $mch "sudo systemctl daemon-reload ; sudo systemctl start neutron-router-helper.timer ; sudo systemctl restart rsyslog"
+}
+
+function _install_dr() {
+  juju-scp $HOME/neutron-dynamic-routing.tgz $mch:
+  juju-ssh $mch "tar -xf neutron-dynamic-routing.tgz ; cd neutron-dynamic-routing ; git checkout 30a9f0b ; sudo python setup.py install --install-scripts=/usr/bin --install-data=/ &>/dev/null"
+}
+
+function _run_dr_agent() {
+  local mch=$1
+  local ip=$2
+
+  local ftmp=$(mktemp)
+  cat <<EOS >$ftmp
+[DEFAULT]
+verbose=True
+debug=False
+[BGP]
+bgp_speaker_driver = neutron_dynamic_routing.services.bgp.agent.driver.ryu.driver.RyuBgpDriver
+bgp_router_id = $ip
+EOS
+  juju-scp $ftmp $mch:bgp_dragent.ini
+  juju-scp $my_dir/files/neutron-bgp-dragent.service $mch:neutron-bgp-dragent.service
+  juju-ssh $mch "sudo mkdir -p /usr/lib/systemd/system ; sudo cp ./neutron-bgp-dragent.service /usr/lib/systemd/system/neutron-bgp-dragent.service"
+  juju-ssh $mch "sudo cp ./bgp_dragent.ini /etc/neutron/bgp_dragent.ini ; sudo chmod 644 /etc/neutron/bgp_dragent.ini ; sudo systemctl start neutron-bgp-dragent.service"
+}
+
+function configure_bgp_neutron_api() {
+  local mch="neutron-api/0"
+  _install_dr $mch
+
+  # run dr agent
+  local ip=`juju-ssh $mch "hostname -i" 2>/dev/null`
+  _run_dr_agent $mch $ip
+
+  # configure dr plugin
+  local path='/usr/local/lib/python2.7/dist-packages/neutron_dynamic_routing/db/migration/alembic_migrations/versions/'
+  juju-ssh $mch "sudo mv $path/pike/expand/* $path/newton/expand/"
+  juju-ssh $mch "sudo neutron-db-manage upgrade heads"
+  juju-set neutron-api "manage-neutron-plugin-legacy-mode=False"
+}
+
+function configure_bgp_agent() {
+  local mch=$1
+  local ip=$2
+
+  _install_dr $mch
+  _run_dr_agent $mch $ip
+}
+
+function create_adv_ip() {
+  local host=$1
+  local ip=$2
+
+  juju-ssh neutron-api/0 "sudo neutron-bgp-manage-adv-ip create --ip $ip --adv-host $host"
+}

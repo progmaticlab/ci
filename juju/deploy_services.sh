@@ -12,24 +12,24 @@ function catch_errors_ce() {
   exit $exit_code
 }
 
-comp1_ip="$addr.$os_comp_1_idx"
+comp1_ip="$network_addr.$os_comp_1_idx"
 comp1=`get_machine_by_ip $comp1_ip`
 echo "INFO: compute 1: $comp1 / $comp1_ip"
-comp2_ip="$addr.$os_comp_2_idx"
+comp2_ip="$network_addr.$os_comp_2_idx"
 comp2=`get_machine_by_ip $comp2_ip`
 echo "INFO: compute 2: $comp2 / $comp2_ip"
 
-cont0_ip="$addr.$os_cont_0_idx"
+cont0_ip="$network_addr.$os_cont_0_idx"
 cont0=`get_machine_by_ip $cont0_ip`
 echo "INFO: controller 0 (OpenStack): $cont0 / $cont0_ip"
 
-net1_ip="$addr.$os_net_1_idx"
+net1_ip="$network_addr.$os_net_1_idx"
 net1=`get_machine_by_ip $net1_ip`
 echo "INFO: network 1: $net1 / $net1_ip"
-net2_ip="$addr.$os_net_2_idx"
+net2_ip="$network_addr.$os_net_2_idx"
 net2=`get_machine_by_ip $net2_ip`
 echo "INFO: network 1: $net2 / $net2_ip"
-net3_ip="$addr.$os_net_3_idx"
+net3_ip="$network_addr.$os_net_3_idx"
 net3=`get_machine_by_ip $net3_ip`
 echo "INFO: network 1: $net3 / $net3_ip"
 

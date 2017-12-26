@@ -1,53 +1,54 @@
-#!/bin/bash
+# this script is used to download and prepare Ubuntu Xenial image for later use in juju environment with kvm virtualization
 
-SSH_KEY=/home/jenkins/.ssh/id_rsa.pub
-BASE_IMAGE_NAME=${BASE_IMAGE_NAME:-"ubuntu-xenial.qcow2"}
-BASE_IMAGE_DIR=${BASE_IMAGE_DIR:-'/home/root/images'}
-BASE_IMAGE="${BASE_IMAGE_DIR}/${BASE_IMAGE_NAME}"
-# makepasswd --clearfrom=- --crypt-md5 <<< '123'
-# $1$WFvHO1ym$CUv6A5XtyFXlIfS2ZZlIf0
+# all commands must be run under root account
 
-apt-get install -y libvirt-clients qemu-utils openssl
+# ssh key for inject into VM image
+SSH_KEY=/root/.ssh/id_rsa.pub
 
-cdir=$(mktemp -d)
-rm -rf $cdir
-mkdir -p $cdir
-cd $cdir
+# utils that are used later
+apt-get install -y libvirt-clients qemu-utils openssl wget
 
-wget -nv https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img -O ./$BASE_IMAGE_NAME
+# download latest Ubuntu Xenial cloud image
+wget -nv https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img -O ./ubuntu-xenial.qcow2
 
-if ! lsmod |grep '^nbd ' ; then
-  modprobe nbd max_part=8
-fi
-nbd_dev="/dev/nbd1"
-qemu-nbd -d $nbd_dev || true
-qemu-nbd -n -c $nbd_dev ./$BASE_IMAGE_NAME
-sleep 5
-ret=0
-tmpdir=$(mktemp -d)
-mount ${nbd_dev}p1 $tmpdir || ret=1
+# check that ndb driver was loaded
+lsmod | grep -q '^nbd ' || modprobe nbd max_part=8
+# mount image. please note that you must unmount image later
+qemu-nbd -d /dev/nbd1 || true
+qemu-nbd -n -c /dev/nbd1 ./ubuntu-xenial.qcow2
 sleep 2
+tmpdir=$(mktemp -d)
+mount /dev/nbd1p1 $tmpdir
+sleep 2
+
+# patch image
+# cause cloud-init creates various objects we can't disable it at all now so we must patch it a bit
 pushd $tmpdir
-sed -i -e 's/^disable_root.*$/disable_root: false/' etc/cloud/cloud.cfg
+# disable metadata requests for cloud-init
 echo 'datasource_list: [ None ]' > etc/cloud/cloud.cfg.d/90_dpkg.cfg
+# enable root account for debug purposes via 'virsh console'
+sed -i -e 's/^disable_root.*$/disable_root: false/' etc/cloud/cloud.cfg
+# set simple password for root user
+# makepasswd --clearfrom=- --crypt-md5 <<< '123'
 sed -i -e 's/^root:\*:/root:$1$WFvHO1ym$CUv6A5XtyFXlIfS2ZZlIf0:/' etc/shadow
+# store ssh keys for root user to be able to ssh into running VM later
 mkdir -p root/.ssh
-cat $SSH_KEY > root/.ssh/authorized_keys
-cat $SSH_KEY > root/.ssh/authorized_keys2
+cp $SSH_KEY root/.ssh/authorized_keys
+cp $SSH_KEY root/.ssh/authorized_keys2
 popd
 
-umount ${nbd_dev}p1 || ret=2
+# unmount image
+umount /dev/nbd1p1
 sleep 2
-rm -rf $tmpdir || ret=3
-qemu-nbd -d $nbd_dev || ret=4
+rm -rf $tmpdir
+qemu-nbd -d /dev/nbd1
 sleep 2
 
-truncate -s 60G temp.raw
-virt-resize --expand /dev/vda1 $BASE_IMAGE_NAME temp.raw
-qemu-img convert -O qcow2 temp.raw $BASE_IMAGE_NAME
+# resize image's FS
+truncate -s 40G temp.raw
+virt-resize --expand /dev/vda1 ubuntu-xenial.qcow2 temp.raw
+qemu-img convert -O qcow2 temp.raw ubuntu-xenial.qcow2
 rm temp.raw
 
-cp $BASE_IMAGE_NAME /var/lib/libvirt/images/
-
-
-#virt-install --name ttt --ram 1024 --vcpus 2 --virt-type kvm --os-type=linux --os-variant ubuntu16.04 --disk path=/var/lib/libvirt/images/ubuntu-xenial-new.qcow2,cache=writeback,bus=virtio,serial=$(uuidgen) --noautoconsole --network network=default --boot hd
+# move image to standard libvirt's location
+mv ubuntu-xenial.qcow2 /var/lib/libvirt/images/
