@@ -9,14 +9,40 @@ cd $WORKSPACE
 source $WORKSPACE/stackrc
 source .venv/bin/activate
 
+net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
+net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
+net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
+bgp1=`get_machine_by_ip $network_addr.$os_bgp_1_idx`
+
 ssh_opts='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5'
 # router id -> for snat and qrouter namespaces
 r_id=`openstack router show rt | awk '/ id /{print $4}'`
+echo "INFO: snat/qrouter namespace id: $r_id"
 # public network id -> for fip namespace
 n_id=`openstack network show public | awk '/ id /{print $4}'`
+echo "INFO: fip namespace id: $n_id"
+
+master_snat=''
+master_snat_ip=''
+function detect_master_snat() {
+  master_snat=''
+  master_snat_ip=''
+  echo "INFO: try to find where is master node for SNAT namespace   $(date)"
+  for ((i=0; i<60; i++)); do
+    for mch in $net1 $net2 $net3 ; do
+      if juju-ssh $mch grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null ; then
+        master_snat=$mch
+        master_snat_ip=`get_machine_ip_by_machine $mch`
+        echo "INFO: master SNAT namespace has been found on machine $mch   $(date)"
+        return
+      fi
+    done
+    echo "WARNING: There is no master SNAT namespace on network nodes...   $(date)"
+    sleep 10
+  done
+}
 
 export OS_PROJECT_NAME=demo
-
 openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 vmp1
 # wait for scheduler places VM-s to hosts
 sleep 5
@@ -28,6 +54,20 @@ if openstack server list | grep -q ERROR ; then
   echo "ERROR: VM-s were not up"
   exit 1
 fi
+export OS_PROJECT_NAME=admin
+
+# try to find where is master SNAT now...
+detect_master_snat
+
+echo "INFO: waiting for bgp announcement on router host   $(date)"
+for ((i=0; i<180; i++)); do
+  if juju-ssh $bgp1 tail -3 /var/log/bird.log | grep "neutron > added .* $master_snat_ip" ; then
+    echo "INFO: bgp announcement was found   $(date)"
+    break
+  fi
+  echo "WARNING: There is no announcement $i/180   $(date)"
+  sleep 10
+done
 
 declare -A vms
 # keys - "${!vms[@]}", values - "${vms[@]}"
@@ -36,7 +76,6 @@ vms["vmp1-2"]=`openstack server list -c Name -c Networks | grep vmp1-2 | awk '{p
 vms["vmp2-1"]=`openstack server list -c Name -c Networks | grep vmp2-1 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 vms["vmp2-2"]=`openstack server list -c Name -c Networks | grep vmp2-2 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 
-export OS_PROJECT_NAME=admin
 openstack server list --all-projects --long -c ID -c Name -c Host
 
 function get_compute_by_vm() {

@@ -76,6 +76,10 @@ function get_machine_ip() {
   juju status $juju_model_arg $service --format tabular | grep "$service/" | head -1 | awk '{print $5}'
 }
 
+function get_machine_ip_by_machine() {
+  juju machines $juju_model_arg | grep "^$1" | awk '{print $3}'
+}
+
 function get_machine_by_ip() {
   local ip=$1
   juju machines $juju_model_arg | grep $ip | awk '{print $1}'
