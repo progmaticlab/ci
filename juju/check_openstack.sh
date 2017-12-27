@@ -21,7 +21,7 @@ openstack server create --image cirros --flavor small --network private1 --min 2
 # wait for scheduler places VM-s to hosts
 sleep 5
 openstack server create --image cirros --flavor small --network private2 --min 2 --max 2 vmp2
-# waiting for VM fully up
+# waiting for VM-s are fully up
 sleep 60
 openstack server list
 if openstack server list | grep -q ERROR ; then

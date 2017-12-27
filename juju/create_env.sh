@@ -24,12 +24,6 @@ if virsh list --all | grep -q "${job_prefix}-cont" ; then
   exit 1
 fi
 
-create_network $network_name $network_addr
-
-# create pool
-virsh pool-info $poolname &> /dev/null || create_pool $poolname
-pool_path=$(get_pool_path $poolname)
-
 function run_machine() {
   local name="$1"
   local cpu="$2"
@@ -73,21 +67,23 @@ function wait_kvm_machine() {
   done
 }
 
-cont_ip="$network_addr.$cont_idx"
-run_machine ${job_prefix}-cont 1 2048 $cont_idx $cont_ip
-wait_kvm_machine $image_user@$cont_ip
-
-echo "INFO: bootstraping juju controller $(date)"
-juju bootstrap manual/$image_user@$cont_ip $juju_controller_name
+declare -A pkgs
+pkgs["cont"]="mc wget bridge-utils"
+pkgs["comp"]="mc wget openvswitch-switch sshpass"
+pkgs["net"]="mc wget openvswitch-switch"
+pkgs["bgp"]="mc wget"
 
 function run_cloud_machine() {
-  local name=${job_prefix}-$1
-  local mac_suffix=$2
+  local prefix=$1
+  local index=$2
   local cpu=$3
   local mem=$4
-  local ip=$5
-
+  local mac_var_name="os_${prefix}_${index}_idx"
+  local mac_suffix=${!mac_var_name}
+  echo "INFO: creating ${prefix} $index (mac suffix $mac_suffix) $(date)"
   local ip="$network_addr.$mac_suffix"
+  local name="${job_prefix}-${prefix}-${index}"
+
   run_machine $name $cpu $mem $mac_suffix $ip
   echo "INFO: start machine $name waiting $name $(date)"
   wait_kvm_machine $image_user@$ip
@@ -95,74 +91,62 @@ function run_cloud_machine() {
   juju-add-machine ssh:$image_user@$ip
   mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
+  echo "INFO: machine $name (machine: $mch) is ready to prepare $(date)"
   # apply hostname
   juju-ssh $mch "sudo bash -c 'echo $name > /etc/hostname ; hostname $name'" 2>/dev/null
   # after first boot we must remove cloud-init
   juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
-  echo "INFO: machine $name (machine: $mch) is ready $(date)"
-}
-
-function run_general_machine() {
-  local prefix=$1
-  local index=$2
-  local cpu=$3
-  local mem=${4:-4096}
-  local mac_var_name="os_${prefix}_${index}_idx"
-  local mac_suffix=${!mac_var_name}
-  echo "INFO: creating ${prefix} $index (mac suffix $mac_suffix) $(date)"
-  local ip="$network_addr.$mac_suffix"
-  run_cloud_machine ${prefix}-$index $mac_suffix $cpu $mem $ip
-  mch=`get_machine_by_ip $ip`
-
-  echo "INFO: preparing ${prefix} $index $(date)"
-  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch sshpass" &>/dev/null
-  juju-scp "$my_dir/files/50-cloud-init-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
-  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+  # add some configuration for lxd 
   juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
-  juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $mch juju-ssh
-}
-
-function run_controller() {
-  local index=$1
-  local mem=$2
-  local prepare_for_openstack=$3
-  local cpu=4
-  local mac_var_name="os_cont_${index}_idx"
-  local mac_suffix=${!mac_var_name}
-  echo "INFO: creating controller $index (mac suffix $mac_suffix) $(date)"
-  local ip="$network_addr.$mac_suffix"
-  run_cloud_machine cont-$index $mac_suffix $cpu $mem $ip
-  mch=`get_machine_by_ip $ip`
-
-  echo "INFO: preparing controller $index $(date)"
-  juju-ssh $mch "sudo apt-get -fy install mc wget bridge-utils" &>/dev/null
-  if [[ "$prepare_for_openstack" == '1' ]]; then
+  # install packages for node
+  juju-ssh $mch "sudo apt-get -fy install ${pkgs[$prefix]}" &>/dev/null
+  if [[ "$prefix" == "cont" ]]; then
+    juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+    juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+    # steps to allow deploy openstack in lxd containers by juju
     juju-ssh $mch "sudo sed -i -e 's/^USE_LXD_BRIDGE.*$/USE_LXD_BRIDGE=\"false\"/m' /etc/default/lxd-bridge" 2>/dev/null
     juju-ssh $mch "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-lxd\"/m' /etc/default/lxd-bridge" 2>/dev/null
+  else
+    juju-scp "$my_dir/files/50-cloud-init-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+    juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   fi
-  juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
-  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
+  # and reboot it to apply changes
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $mch juju-ssh
 }
 
-run_controller 0 8192 1
+# create virtual network
+create_network $network_name $network_addr
 
-run_general_machine comp 1 4 4096
-run_general_machine comp 2 4 4096
+# create volume's pool
+virsh pool-info $poolname &> /dev/null || create_pool $poolname
+pool_path=$(get_pool_path $poolname)
 
-run_general_machine net 1 2 2048
-run_general_machine net 2 2 2048
-run_general_machine net 3 2 2048
+# create and run machine for juju controller
+cont_ip="$network_addr.$cont_idx"
+run_machine ${job_prefix}-cont 1 2048 $cont_idx $cont_ip
+wait_kvm_machine $image_user@$cont_ip
+# and bootstraps it
+echo "INFO: bootstraping juju controller $(date)"
+juju bootstrap manual/$image_user@$cont_ip $juju_controller_name
 
-run_general_machine bgp 1 1 2048
+# create and run machine for OpenStack controllers
+run_cloud_machine cont 0 $controller_cpu $controller_mem
+# create and run machines for compute service
+run_cloud_machine comp 1 $compute_cpu $compute_mem
+run_cloud_machine comp 2 $compute_cpu $compute_mem
+# create and run machines for network nodes
+run_cloud_machine net 1 $network_cpu $network_mem
+run_cloud_machine net 2 $network_cpu $network_mem
+run_cloud_machine net 3 $network_cpu $network_mem
+# create and run machine for router emulator
+run_cloud_machine bgp 1 $router_cpu $router_mem
 
+# wait for all machines are up
 wait_for_all_machines
 
 echo "INFO: Environment created $(date)"
 
+# print deployment status
 virsh net-dhcp-leases $network_name
 juju-status-tabular
 
