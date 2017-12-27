@@ -153,11 +153,11 @@ run_controller 0 8192 1
 run_general_machine comp 1 4 4096
 run_general_machine comp 2 4 4096
 
-run_general_machine net 1 2
-run_general_machine net 2 2
-run_general_machine net 3 2
+run_general_machine net 1 2 2048
+run_general_machine net 2 2 2048
+run_general_machine net 3 2 2048
 
-run_general_machine bgp 2 1 2048
+run_general_machine bgp 1 1 2048
 
 wait_for_all_machines
 
