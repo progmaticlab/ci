@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
@@ -6,7 +6,6 @@ source "$my_dir/functions"
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 # prepare environment for common openstack functions
-SSH_CMD="juju-ssh"
 export PASSWORD=password
 
 cd $WORKSPACE
@@ -60,12 +59,6 @@ openstack router add subnet rt private2
 
 openstack security group rule create default --protocol icmp
 openstack security group rule create default --protocol tcp --dst-port 22:22
-
-openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 ttt
-sleep 5
-openstack server create --image cirros --flavor small --network private2 --min 2 --max 2 rrr
-sleep 20
-openstack server list
 
 export OS_PROJECT_NAME=admin
 
