@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
@@ -85,11 +85,11 @@ function run_cloud_machine() {
   local name="${job_prefix}-${prefix}-${index}"
 
   run_machine $name $cpu $mem $mac_suffix $ip
-  echo "INFO: start machine $name waiting $name $(date)"
+  echo "INFO: start machine waiting: $name $(date)"
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
   juju-add-machine ssh:$image_user@$ip
-  mch=`get_machine_by_ip $ip`
+  local mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
   echo "INFO: machine $name (machine: $mch) is ready to prepare $(date)"
   # apply hostname
