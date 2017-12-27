@@ -33,6 +33,10 @@ net3_ip="$network_addr.$os_net_3_idx"
 net3=`get_machine_by_ip $net3_ip`
 echo "INFO: network 1: $net3 / $net3_ip"
 
+bgp1_ip="$network_addr.$os_bgp_1_idx"
+bgp1=`get_machine_by_ip $bgp1_ip`
+echo "INFO: bgp 1: $bgp1 / $bgp1_ip"
+
 # OpenStack base
 
 echo "INFO: Deploy all $(date)"
@@ -110,6 +114,9 @@ juju-add-relation "neutron-openvswitch" "neutron-api"
 juju-add-relation "neutron-openvswitch" "rabbitmq-server"
 
 post_deploy
+
+juju-scp $my_dir/__deploy_bgp_peer.sh $bgp1:deploy_bgp_peer.sh
+juju-ssh $bgp1 sudo ./deploy_bgp_peer.sh $(get_machine_ip neutron-api)
 
 # TODO: these settings are not permanent. it must be applied after reboot.
 configure_l3_routing $comp1

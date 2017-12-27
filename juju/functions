@@ -12,7 +12,7 @@ network_name="$job_prefix"
 # bird daemon configured to this CIDR/DHCP-range on KVM
 network_addr="10.0.0"
 dhcp_start="$network_addr.100"
-dhcp_end="$network_addr.129"
+dhcp_end="$network_addr.149"
 
 mac_base='52:54:00:10:00'
 # juju controller
@@ -26,6 +26,8 @@ os_net_3_idx='22'
 # openstack compute
 os_comp_1_idx='30'
 os_comp_2_idx='31'
+# machine with bird (emulates bgp switch)
+os_bgp_1_idx='50'
 
 # openstack definitions
 public_network_addr="10.10.0"

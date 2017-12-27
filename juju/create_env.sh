@@ -80,8 +80,6 @@ wait_kvm_machine $image_user@$cont_ip
 echo "INFO: bootstraping juju controller $(date)"
 juju bootstrap manual/$image_user@$cont_ip $juju_controller_name
 
-declare -A machines
-
 function run_cloud_machine() {
   local name=${job_prefix}-$1
   local mac_suffix=$2
@@ -94,44 +92,28 @@ function run_cloud_machine() {
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
   juju-add-machine ssh:$image_user@$ip
-  machines["$name"]=$ip
   mch=`get_machine_by_ip $ip`
   wait_kvm_machine $mch juju-ssh
+  # apply hostname
+  juju-ssh $mch "sudo bash -c 'echo $name > /etc/hostname ; hostname $name'" 2>/dev/null
   # after first boot we must remove cloud-init
   juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
   echo "INFO: machine $name (machine: $mch) is ready $(date)"
 }
 
-function run_compute() {
-  local index=$1
-  local mac_var_name="os_comp_${index}_idx"
+function run_general_machine() {
+  local prefix=$1
+  local index=$2
+  local mac_var_name="os_${prefix}_${index}_idx"
   local mac_suffix=${!mac_var_name}
-  echo "INFO: creating compute $index (mac suffix $mac_suffix) $(date)"
+  echo "INFO: creating ${prefix} $index (mac suffix $mac_suffix) $(date)"
   local ip="$network_addr.$mac_suffix"
-  run_cloud_machine comp-$index $mac_suffix 4096 $ip
+  run_cloud_machine ${prefix}-$index $mac_suffix 4096 $ip
   mch=`get_machine_by_ip $ip`
 
-  echo "INFO: preparing compute $index $(date)"
+  echo "INFO: preparing ${prefix} $index $(date)"
   juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
-  juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
-  juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
-  juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
-  wait_kvm_machine $mch juju-ssh
-}
-
-function run_network() {
-  local index=$1
-  local mac_var_name="os_net_${index}_idx"
-  local mac_suffix=${!mac_var_name}
-  echo "INFO: creating network $index (mac suffix $mac_suffix) $(date)"
-  local ip="$network_addr.$mac_suffix"
-  run_cloud_machine net-$index $mac_suffix 4096 $ip
-  mch=`get_machine_by_ip $ip`
-
-  echo "INFO: preparing network $index $(date)"
-  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch" &>>$log_dir/apt.log
-  juju-scp "$my_dir/files/50-cloud-init-compute-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
+  juju-scp "$my_dir/files/50-cloud-init-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
@@ -164,31 +146,16 @@ function run_controller() {
 
 run_controller 0 8192 1
 
-run_compute 1
-run_compute 2
+run_general_machine comp 1
+run_general_machine comp 2
 
-run_network 1
-run_network 2
-run_network 3
+run_general_machine net 1
+run_general_machine net 2
+run_general_machine net 3
+
+run_general_machine bgp 1
 
 wait_for_all_machines
-
-echo "INFO: creating hosts file $(date)"
-#truncate -s 0 $WORKSPACE/hosts
-#for m in ${!machines[@]} ; do
-#  echo "${machines[$m]}    $m" >> $WORKSPACE/hosts
-#done
-#cat $WORKSPACE/hosts
-echo "INFO: Applying hosts file and hostnames $(date)"
-for m in ${!machines[@]} ; do
-  ip=${machines[$m]}
-  mch=`get_machine_by_ip $ip`
-  echo "INFO: Apply $m for $ip"
-  #juju-scp $WORKSPACE/hosts $mch:hosts
-  juju-ssh $mch "sudo bash -c 'echo $m > /etc/hostname ; hostname $m'" 2>/dev/null
-  #juju-ssh $mch 'sudo bash -c "cat ./hosts >> /etc/hosts"' 2>/dev/null
-done
-#rm -f $WORKSPACE/hosts
 
 echo "INFO: Environment created $(date)"
 
