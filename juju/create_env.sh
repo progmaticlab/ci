@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
+export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
-
 source "$my_dir/functions"
 
 # prepared image parameters
@@ -115,7 +115,7 @@ function run_general_machine() {
   mch=`get_machine_by_ip $ip`
 
   echo "INFO: preparing ${prefix} $index $(date)"
-  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch sshpass" &>>$log_dir/apt.log
+  juju-ssh $mch "sudo apt-get -fy install mc wget openvswitch-switch sshpass" &>/dev/null
   juju-scp "$my_dir/files/50-cloud-init-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
   juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
@@ -136,10 +136,10 @@ function run_controller() {
   mch=`get_machine_by_ip $ip`
 
   echo "INFO: preparing controller $index $(date)"
-  juju-ssh $mch "sudo apt-get -fy install mc wget bridge-utils" &>>$log_dir/apt.log
+  juju-ssh $mch "sudo apt-get -fy install mc wget bridge-utils" &>/dev/null
   if [[ "$prepare_for_openstack" == '1' ]]; then
     juju-ssh $mch "sudo sed -i -e 's/^USE_LXD_BRIDGE.*$/USE_LXD_BRIDGE=\"false\"/m' /etc/default/lxd-bridge" 2>/dev/null
-    juju-ssh $mch "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-$IF1\"/m' /etc/default/lxd-bridge" 2>/dev/null
+    juju-ssh $mch "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-lxd\"/m' /etc/default/lxd-bridge" 2>/dev/null
   fi
   juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
   juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
@@ -164,5 +164,6 @@ wait_for_all_machines
 echo "INFO: Environment created $(date)"
 
 virsh net-dhcp-leases $network_name
+juju-status-tabular
 
 trap - ERR EXIT

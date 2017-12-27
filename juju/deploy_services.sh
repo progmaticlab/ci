@@ -1,8 +1,11 @@
 #!/bin/bash -e
 
+export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
 source "$my_dir/functions"
+
+OPENSTACK_ORIGIN="cloud:xenial-ocata"
 
 trap 'catch_errors_ce $LINENO' ERR EXIT
 function catch_errors_ce() {
@@ -44,7 +47,7 @@ juju-deploy cs:xenial/ntp
 
 juju-deploy cs:xenial/rabbitmq-server --to lxd:$cont0
 juju-deploy cs:xenial/percona-cluster mysql --to lxd:$cont0
-juju-set mysql "root-password=$PASSWORD" "max-connections=1500"
+juju-set mysql "root-password=${PASSWORD:-password}" "max-connections=1500"
 
 juju-deploy cs:xenial/openstack-dashboard --to lxd:$cont0
 juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN"
@@ -59,7 +62,7 @@ juju-set glance "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose glance
 
 juju-deploy cs:xenial/keystone --to lxd:$cont0
-juju-set keystone "admin-password=$PASSWORD" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
+juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose keystone
 
 juju-deploy cs:xenial/nova-compute --to $comp1
@@ -75,7 +78,7 @@ juju-deploy neutron-openvswitch
 juju-set neutron-openvswitch "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 
 juju-deploy neutron-gateway --to $net1
-juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "ha-bindiface=$IF1" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
+juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
 

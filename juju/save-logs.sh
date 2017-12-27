@@ -1,16 +1,23 @@
 #!/bin/bash
 
+export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
 source $my_dir/common/functions
 
 echo "--------------------------------------------------- Save LOGS ---"
 
-log_dir=$WORKSPACE/logs
+log_dir="$WORKSPACE/logs"
+# set up log directory
+if [ -d "$log_dir" ] ; then
+  chmod -R u+w "$log_dir"
+  rm -rf "$log_dir"
+fi
+mkdir "$log_dir"
 
 # save status to file
-juju-status > $log_dir/juju_status.log
-juju-status-tabular > $log_dir/juju_status_tabular.log
+juju-status > "$log_dir/juju_status.log"
+juju-status-tabular > "$log_dir/juju_status_tabular.log"
 
 truncate -s 0 $log_dir/juju_unit_statuses.log
 for unit in `timeout -s 9 30 juju status $juju_model_arg --format oneline | awk '{print $2}' | sed 's/://g'` ; do

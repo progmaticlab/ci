@@ -1,10 +1,9 @@
 #!/bin/bash -ex
 
+export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
 source "$my_dir/functions"
-
-export WORKSPACE="${WORKSPACE:-$HOME}"
 
 cd $WORKSPACE
 source $WORKSPACE/stackrc
@@ -19,9 +18,11 @@ n_id=`openstack network show public | awk '/ id /{print $4}'`
 export OS_PROJECT_NAME=demo
 
 openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 vmp1
+# wait for scheduler places VM-s to hosts
 sleep 5
 openstack server create --image cirros --flavor small --network private2 --min 2 --max 2 vmp2
-sleep 20
+# waiting for VM fully up
+sleep 60
 openstack server list
 if openstack server list | grep -q ERROR ; then
   echo "ERROR: VM-s were not up"

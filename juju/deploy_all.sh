@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 # main deployment script - it orchestrates deployment process
+export WORKSPACE="${WORKSPACE:-$HOME}"
 
 my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
@@ -13,21 +14,6 @@ if [[ "$CLEAN_BEFORE" == 'true' || "$CLEAN_BEFORE" == 'clean_and_exit' ]] ; then
     exit
   fi
 fi
-
-# set up log directory
-export log_dir="$WORKSPACE/logs"
-if [ -d $log_dir ] ; then
-  chmod -R u+w "$log_dir"
-  rm -rf "$log_dir"
-fi
-mkdir "$log_dir"
-
-# next step tested only with xenial/ocata
-export OPENSTACK_ORIGIN="cloud:xenial-ocata"
-# common password for all services
-export PASSWORD=${PASSWORD:-'password'}
-# interfaces for ubuntu. it's used for provision neutron's public network. treated as host network interface 
-export IF1='ens3'
 
 # check if environment is present
 if virsh list --all | grep -q "${job_prefix}-cont" ; then
@@ -62,7 +48,6 @@ env|sort
 # create kvm machines for deployment
 echo "INFO: creating environment $(date)"
 "$my_dir"/create_env.sh
-juju-status-tabular
 
 # deploy services and post configures
 "$my_dir"/deploy_services.sh
