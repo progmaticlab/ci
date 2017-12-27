@@ -7,7 +7,7 @@ apt-get install -y bird
 systemctl stop bird
 rm -rf /var/log/bird.log
 touch /var/log/bird.log
-chmod a+x /var/log/bird.log
+chmod a+rw /var/log/bird.log
 
 cat <<EOF > /etc/bird/bird.conf
 log "/var/log/bird.log" all;

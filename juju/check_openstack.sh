@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
@@ -49,6 +49,7 @@ function get_compute_by_vm() {
 function check_ping_from_vm() {
   local vm_name=$1
   local ping_addr=$2
+  echo "INFO: check ping from $vm_name to $ping_addr"
   compute=`get_compute_by_vm $vm_name`
   juju-ssh $compute sudo ip netns exec qrouter-$r_id sshpass -p 'cubswin:\)' ssh $ssh_opts cirros@${vms["$vm_name"]} ping -c 3 $ping_addr
 }
@@ -59,8 +60,8 @@ check_ping_from_vm "vmp1-1" ${vms["vmp2-1"]}
 check_ping_from_vm "vmp1-1" ${vms["vmp2-2"]}
 
 # check north-south traffic by pinging external router (external world) from vm-s without floating ip
-check_ping_from_vm "vmp1-1" $network_address.$os_bgp_1_idx
-check_ping_from_vm "vmp1-2" $network_address.$os_bgp_1_idx
-check_ping_from_vm "vmp2-1" $network_address.$os_bgp_1_idx
-check_ping_from_vm "vmp2-2" $network_address.$os_bgp_1_idx
+check_ping_from_vm "vmp1-1" $network_addr.$os_bgp_1_idx
+check_ping_from_vm "vmp1-2" $network_addr.$os_bgp_1_idx
+check_ping_from_vm "vmp2-1" $network_addr.$os_bgp_1_idx
+check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 
