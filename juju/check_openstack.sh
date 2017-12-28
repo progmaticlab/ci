@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
@@ -71,16 +71,16 @@ done
 
 declare -A vms
 # keys - "${!vms[@]}", values - "${vms[@]}"
-vms["vmp1-1"]=`openstack server list -c Name -c Networks | awk '/vmp1-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp1-2"]=`openstack server list -c Name -c Networks | awk '/vmp1-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp2-1"]=`openstack server list -c Name -c Networks | awk '/vmp2-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp2-2"]=`openstack server list -c Name -c Networks | awk '/vmp2-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp1-1"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp1-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp1-2"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp1-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp2-1"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp2-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp2-2"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp2-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 
-openstack server list --all-projects --long -c ID -c Name -c Host -c Networks
+openstack server list --all-projects -c ID -c Name -c Host -c Networks
 
 function get_compute_by_vm() {
   local vm_name=$1
-  local compute=`openstack server list --all-projects --long -c Name -c Host | grep $vm_name | awk '{print $4}'`
+  local compute=`openstack server list --all-projects -c Name -c Host | grep $vm_name | awk '{print $4}'`
   compute_ip=`virsh net-dhcp-leases $network_name | grep $compute | awk '{print $5}' | cut -d '/' -f 1`
   get_machine_by_ip $compute_ip
 }
