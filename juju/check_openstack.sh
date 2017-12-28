@@ -9,6 +9,22 @@ cd $WORKSPACE
 source $WORKSPACE/stackrc
 source .venv/bin/activate
 
+# just run 4 machines
+export OS_PROJECT_NAME=demo
+openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 vmp1
+# wait for scheduler places VM-s to hosts
+sleep 5
+openstack server create --image cirros --flavor small --network private2 --min 2 --max 2 vmp2
+# waiting for VM-s are fully up
+sleep 60
+openstack server list
+if openstack server list | grep -q ERROR ; then
+  echo "ERROR: VM-s were not up"
+  exit 1
+fi
+export OS_PROJECT_NAME=admin
+
+# and test ...
 net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
 net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
 net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
@@ -23,17 +39,21 @@ n_id=`openstack network show public | awk '/ id /{print $4}'`
 echo "INFO: fip namespace id: $n_id"
 
 master_snat=''
-master_snat_ip=''
 function detect_master_snat() {
+  # non local variables - they are used in code
   master_snat=''
   master_snat_ip=''
+  master_snat_name=''
+  master_snat_guid=''
   echo "INFO: try to find where is master node for SNAT namespace   $(date)"
   for ((i=0; i<60; i++)); do
     for mch in $net1 $net2 $net3 ; do
       if juju-ssh $mch grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null ; then
         master_snat=$mch
         master_snat_ip=`get_machine_ip_by_machine $mch`
-        echo "INFO: master SNAT namespace has been found on machine $mch   $(date)"
+        master_snat_name=`juju-ssh $mch hostname -s 2>/dev/null`
+        master_snat_guid=`openstack network agent list --agent-type l3 | grep " $master_snat_name " | awk '{print $2}'`
+        echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
         return
       fi
     done
@@ -41,20 +61,6 @@ function detect_master_snat() {
     sleep 10
   done
 }
-
-export OS_PROJECT_NAME=demo
-openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 vmp1
-# wait for scheduler places VM-s to hosts
-sleep 5
-openstack server create --image cirros --flavor small --network private2 --min 2 --max 2 vmp2
-# waiting for VM-s are fully up
-sleep 60
-openstack server list
-if openstack server list | grep -q ERROR ; then
-  echo "ERROR: VM-s were not up"
-  exit 1
-fi
-export OS_PROJECT_NAME=admin
 
 # try to find where is master SNAT now...
 detect_master_snat
@@ -76,21 +82,25 @@ vms["vmp1-2"]=`openstack server list --all-projects -c Name -c Networks | awk '/
 vms["vmp2-1"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp2-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 vms["vmp2-2"]=`openstack server list --all-projects -c Name -c Networks | awk '/vmp2-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 
-openstack server list --all-projects -c ID -c Name -c Host -c Networks
+openstack server list --all-projects --long -c ID -c Name -c Host -c Networks
 
 function get_compute_by_vm() {
   local vm_name=$1
-  local compute=`openstack server list --all-projects -c Name -c Host | grep $vm_name | awk '{print $4}'`
-  compute_ip=`virsh net-dhcp-leases $network_name | grep $compute | awk '{print $5}' | cut -d '/' -f 1`
+  local compute=`openstack server list --all-projects --long -c Name -c Host | grep $vm_name | awk '{print $4}'`
+  local compute_ip=`virsh net-dhcp-leases $network_name | grep $compute | awk '{print $5}' | cut -d '/' -f 1`
   get_machine_by_ip $compute_ip
+}
+
+function _ping() {
+  juju-ssh $1 sudo ip netns exec qrouter-$r_id sshpass -p 'cubswin:\)' ssh $ssh_opts cirros@$2 ping -c $3 $4
 }
 
 function check_ping_from_vm() {
   local vm_name=$1
   local ping_addr=$2
   echo "INFO: check ping from $vm_name to $ping_addr"
-  compute=`get_compute_by_vm $vm_name`
-  juju-ssh $compute sudo ip netns exec qrouter-$r_id sshpass -p 'cubswin:\)' ssh $ssh_opts cirros@${vms["$vm_name"]} ping -c 3 $ping_addr
+  local compute=`get_compute_by_vm $vm_name`
+  _ping $compute ${vms["$vm_name"]} 3 $ping_addr
 }
 
 # check east-west traffic by pinging from one vm to all other vm-s
@@ -104,3 +114,21 @@ check_ping_from_vm "vmp1-2" $network_addr.$os_bgp_1_idx
 check_ping_from_vm "vmp2-1" $network_addr.$os_bgp_1_idx
 check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 
+# check master SNAT namespace moving... do it for one any vm
+echo "INFO: disable master SNAT and check moving to another network node   $(date)"
+old_master_snat=$master_snat
+olg_master_snat_guid=$master_snat_guid
+openstack network agent set --disable $master_snat_guid
+vm_name="vmp1-1"
+compute=`get_compute_by_vm $vm_name`
+while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx ; do
+  echo "INFO: ping to external world still work   $(date)"
+  sleep 1
+done
+while !_ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx ; do
+  echo "INFO: ping to external world still doensn't work   $(date)"
+  sleep 1
+done
+detect_master_snat
+echo "INFO: master SNAT has been moved from machine $old_master_snat   $(date)"
+openstack network agent set --enable $old_master_snat_guid
