@@ -33,6 +33,8 @@ fi
 export OS_PROJECT_NAME=admin
 
 # and test ...
+comp1=`get_machine_by_ip $network_addr.$os_comp_1_idx`
+comp2=`get_machine_by_ip $network_addr.$os_comp_2_idx`
 net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
 net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
 net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
@@ -114,6 +116,15 @@ function check_ping_from_vm() {
   _ping $compute ${vms["$vm_name"]} 3 $ping_addr
 }
 
+function print_vxlan() {
+  echo ""
+  echo "INFO: vxlan information"
+  for mch in $comp1 $comp2 $net1 $net2 $net3 ; do
+    echo "INFO: interfaces for machine $mch"
+    juju-ssh $mch ovs-vsctl show 2>/dev/null | grep -A 1 vxlan | grep -vP "Port|type"
+  done
+}
+
 # check east-west traffic by pinging from one vm to all other vm-s
 check_ping_from_vm "vmp1-1" ${vms["vmp1-2"]}
 check_ping_from_vm "vmp1-1" ${vms["vmp2-1"]}
@@ -129,6 +140,7 @@ check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 vm_name="vmp1-1"
 compute=`get_compute_by_vm $vm_name`
 for ((i=1; i<6; i++)); do
+  print_vxlan
   echo "INFO: disable master SNAT and check moving to another network node (test $i/5)   ---------------------------------------------------------------------- $(date)"
   old_master_snat=$master_snat
   old_master_snat_guid=$master_snat_guid
@@ -144,6 +156,8 @@ for ((i=1; i<6; i++)); do
   detect_master_snat
   echo "INFO: master SNAT has been moved from machine $old_master_snat   $(date)"
   openstack network agent set --enable $old_master_snat_guid
+  print_vxlan
+  echo ""
   echo "INFO: waiting a minute before next try   $(date)"
   sleep 60
 done
