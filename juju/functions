@@ -196,3 +196,10 @@ function create_adv_ip() {
 
   juju-ssh neutron-api/0 "sudo neutron-bgp-manage-adv-ip create --ip $ip --adv-host $host" 2>/dev/null
 }
+
+function restart_neutron() {
+  local mch=$1
+  for item in `juju-ssh $mch "systemctl -a | grep Neutron" 2>/dev/null| grep -v router-helper | awk '{print $1}'`
+    juju-ssh $mch sudo systemctl restart $item 2>/dev/null
+  done
+}

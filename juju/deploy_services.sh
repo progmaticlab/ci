@@ -118,6 +118,13 @@ juju-add-relation "neutron-openvswitch" "rabbitmq-server"
 
 post_deploy
 
+# looks like that charms do not restart neutron services after config files were written
+restart_neutron $comp1
+restart_neutron $comp2
+restart_neutron $net1
+restart_neutron $net2
+restart_neutron $net3
+
 juju-scp $my_dir/__deploy_bgp_peer.sh $bgp1:deploy_bgp_peer.sh
 juju-ssh $bgp1 sudo ./deploy_bgp_peer.sh $(get_machine_ip neutron-api)
 

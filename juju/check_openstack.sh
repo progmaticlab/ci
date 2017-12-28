@@ -139,8 +139,8 @@ print_vxlan
 # check master SNAT namespace moving... do it for one any vm
 vm_name="vmp1-1"
 compute=`get_compute_by_vm $vm_name`
-for ((i=1; i<10; i++)); do
-  echo "INFO: disable master SNAT (machine $master_snat) and check moving to another network node (test $i/5)   -------------------------------------------- $(date)"
+for ((i=1; i<=10; i++)); do
+  echo "INFO: disable master SNAT (machine $master_snat) and check moving to another network node (test $i/10)   -------------------------------------------- $(date)"
   old_master_snat=$master_snat
   old_master_snat_guid=$master_snat_guid
   openstack network agent set --disable $master_snat_guid
