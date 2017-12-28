@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 export WORKSPACE="${WORKSPACE:-$HOME}"
 my_file="$(readlink -e "$0")"
@@ -61,7 +61,7 @@ detect_master_snat
 
 echo "INFO: waiting for bgp announcement on router host   $(date)"
 for ((i=0; i<180; i++)); do
-  if juju-ssh $bgp1 tail -3 /var/log/bird.log | grep "neutron > added .* $master_snat_ip" ; then
+  if juju-ssh $bgp1 tail -3 /var/log/bird.log 2>/dev/null | grep "neutron > added .* $master_snat_ip" ; then
     echo "INFO: bgp announcement was found   $(date)"
     break
   fi
@@ -71,12 +71,12 @@ done
 
 declare -A vms
 # keys - "${!vms[@]}", values - "${vms[@]}"
-vms["vmp1-1"]=`openstack server list -c Name -c Networks | grep vmp1-1 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp1-2"]=`openstack server list -c Name -c Networks | grep vmp1-2 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp2-1"]=`openstack server list -c Name -c Networks | grep vmp2-1 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
-vms["vmp2-2"]=`openstack server list -c Name -c Networks | grep vmp2-2 | awk '{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp1-1"]=`openstack server list -c Name -c Networks | awk '/vmp1-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp1-2"]=`openstack server list -c Name -c Networks | awk '/vmp1-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp2-1"]=`openstack server list -c Name -c Networks | awk '/vmp2-1/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
+vms["vmp2-2"]=`openstack server list -c Name -c Networks | awk '/vmp2-2/{print $4}' | cut -d '=' -f 2 | cut -d ',' -f 1`
 
-openstack server list --all-projects --long -c ID -c Name -c Host
+openstack server list --all-projects --long -c ID -c Name -c Host -c Networks
 
 function get_compute_by_vm() {
   local vm_name=$1
