@@ -123,20 +123,23 @@ check_ping_from_vm "vmp2-1" $network_addr.$os_bgp_1_idx
 check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 
 # check master SNAT namespace moving... do it for one any vm
-echo "INFO: disable master SNAT and check moving to another network node   $(date)"
-old_master_snat=$master_snat
-old_master_snat_guid=$master_snat_guid
-openstack network agent set --disable $master_snat_guid
 vm_name="vmp1-1"
 compute=`get_compute_by_vm $vm_name`
-while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
-  echo "INFO: ping to external world still work   $(date)"
-  sleep 1
+for ((i=1; i<6; i++)); do
+echo "INFO: disable master SNAT and check moving to another network node (test $i/5)   $(date)"
+  old_master_snat=$master_snat
+  old_master_snat_guid=$master_snat_guid
+  openstack network agent set --disable $master_snat_guid
+  while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
+    echo "INFO: ping to external world still work   $(date)"
+    sleep 1
+  done
+  while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
+    echo "INFO: ping to external world still doensn't work   $(date)"
+    sleep 1
+  done
+  detect_master_snat
+  echo "INFO: master SNAT has been moved from machine $old_master_snat   $(date)"
+  openstack network agent set --enable $old_master_snat_guid
+  sleep 30
 done
-while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
-  echo "INFO: ping to external world still doensn't work   $(date)"
-  sleep 1
-done
-detect_master_snat
-echo "INFO: master SNAT has been moved from machine $old_master_snat   $(date)"
-openstack network agent set --enable $old_master_snat_guid
