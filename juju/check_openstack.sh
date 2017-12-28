@@ -48,10 +48,10 @@ function detect_master_snat() {
   echo "INFO: try to find where is master node for SNAT namespace   $(date)"
   for ((i=0; i<60; i++)); do
     for mch in $net1 $net2 $net3 ; do
-      if juju-ssh $mch grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null ; then
+      if juju-ssh $mch "grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null" 2>/dev/null ; then
         master_snat=$mch
         master_snat_ip=`get_machine_ip_by_machine $mch`
-        master_snat_name=`juju-ssh $mch hostname -s 2>/dev/null`
+        master_snat_name=`virsh net-dhcp-leases $network_name | grep $master_snat_ip | awk '{print $6}'`
         master_snat_guid=`openstack network agent list --agent-type l3 | grep " $master_snat_name " | awk '{print $2}'`
         echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
         return
@@ -117,15 +117,15 @@ check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 # check master SNAT namespace moving... do it for one any vm
 echo "INFO: disable master SNAT and check moving to another network node   $(date)"
 old_master_snat=$master_snat
-olg_master_snat_guid=$master_snat_guid
+old_master_snat_guid=$master_snat_guid
 openstack network agent set --disable $master_snat_guid
 vm_name="vmp1-1"
 compute=`get_compute_by_vm $vm_name`
-while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx ; do
+while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
   echo "INFO: ping to external world still work   $(date)"
   sleep 1
 done
-while !_ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx ; do
+while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
   echo "INFO: ping to external world still doensn't work   $(date)"
   sleep 1
 done
