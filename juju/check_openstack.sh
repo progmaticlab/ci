@@ -121,7 +121,7 @@ function print_vxlan() {
   echo "INFO: vxlan information"
   for mch in $comp1 $comp2 $net1 $net2 $net3 ; do
     echo "INFO: interfaces for machine $mch"
-    juju-ssh $mch sudo ovs-vsctl show 2>/dev/null | grep -A 1 vxlan | grep -vP "Port|type"
+    juju-ssh $mch sudo ovs-vsctl show 2>/dev/null | grep -A 1 vxlan | grep -vP "Port|type|--" || /bin/true
   done
 }
 
