@@ -54,7 +54,8 @@ function detect_master_snat() {
   master_snat_name=''
   master_snat_guid=''
   echo "INFO: try to find where is master node for SNAT namespace   $(date)"
-  for ((i=0; i<60; i++)); do
+  local ii=0
+  for ((ii=0; ii<60; ii++)); do
     for mch in $net1 $net2 $net3 ; do
       if juju-ssh $mch "grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null" 2>/dev/null ; then
         master_snat=$mch
@@ -68,6 +69,8 @@ function detect_master_snat() {
     echo "WARNING: There is no master SNAT namespace on network nodes...   $(date)"
     sleep 10
   done
+  echo "ERROR: master SNAT couldn't be detected.   $(date)"
+  return 1
 }
 
 # try to find where is master SNAT now...
@@ -126,7 +129,7 @@ check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
 vm_name="vmp1-1"
 compute=`get_compute_by_vm $vm_name`
 for ((i=1; i<6; i++)); do
-echo "INFO: disable master SNAT and check moving to another network node (test $i/5)   $(date)"
+  echo "INFO: disable master SNAT and check moving to another network node (test $i/5)   ---------------------------------------------------------------------- $(date)"
   old_master_snat=$master_snat
   old_master_snat_guid=$master_snat_guid
   openstack network agent set --disable $master_snat_guid
@@ -141,5 +144,6 @@ echo "INFO: disable master SNAT and check moving to another network node (test $
   detect_master_snat
   echo "INFO: master SNAT has been moved from machine $old_master_snat   $(date)"
   openstack network agent set --enable $old_master_snat_guid
-  sleep 30
+  echo "INFO: waiting a minute before next try   $(date)"
+  sleep 60
 done
