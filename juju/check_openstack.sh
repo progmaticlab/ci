@@ -156,6 +156,7 @@ for ((i=1; i<=10; i++)); do
     sleep 1
     ((++j))
     if ((j > 80)); then
+      j=0
       echo "WARNING: restoring connection is too long. do ovs emer-reset on current SNAT master"
       # maybe it's better to disable/enable this master
       detect_master_snat
