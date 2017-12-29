@@ -50,20 +50,30 @@ echo "INFO: fip namespace id: $n_id"
 
 master_snat=''
 function detect_master_snat() {
-  # non local variables - they are used in code
   master_snat=''
-  master_snat_ip=''
-  master_snat_name=''
-  master_snat_guid=''
+  for mch in $net1 $net2 $net3 ; do
+    if juju-ssh $mch "grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null" 2>/dev/null ; then
+      master_snat=$mch
+      return 0
+    fi
+  done
+  return 1
+}
+
+function get_master_snat_attributes() {
+  if [[ -z "$master_snat" ]]; then return ; fi
+  # non local variables - they are used in code
+  master_snat_ip=`get_machine_ip_by_machine $master_snat`
+  master_snat_name=`virsh net-dhcp-leases $network_name | grep $master_snat_ip | awk '{print $6}'`
+  master_snat_guid=`openstack network agent list --agent-type l3 | grep " $master_snat_name " | awk '{print $2}'`
+}
+
+function wait_for_master_snat() {
   echo "INFO: try to find where is master node for SNAT namespace   $(date)"
   local ii=0
   for ((ii=0; ii<60; ii++)); do
-    for mch in $net1 $net2 $net3 ; do
-      if juju-ssh $mch "grep -q master /var/lib/neutron/ha_confs/$r_id/state 2>/dev/null" 2>/dev/null ; then
-        master_snat=$mch
-        master_snat_ip=`get_machine_ip_by_machine $mch`
-        master_snat_name=`virsh net-dhcp-leases $network_name | grep $master_snat_ip | awk '{print $6}'`
-        master_snat_guid=`openstack network agent list --agent-type l3 | grep " $master_snat_name " | awk '{print $2}'`
+    if detect_master_snat ; then
+        get_master_snat_attributes
         echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
         return
       fi
@@ -76,7 +86,7 @@ function detect_master_snat() {
 }
 
 # try to find where is master SNAT now...
-detect_master_snat
+wait_for_master_snat
 
 echo "INFO: waiting for bgp announcement on router host   $(date)"
 for ((i=0; i<180; i++)); do
@@ -105,7 +115,7 @@ function get_compute_by_vm() {
 }
 
 function _ping() {
-  juju-ssh $1 sudo ip netns exec qrouter-$r_id sshpass -p 'cubswin:\)' ssh $ssh_opts cirros@$2 ping -c $3 $4
+  juju-ssh $1 sudo ip netns exec qrouter-$r_id sshpass -p 'cubswin:\)' ssh $ssh_opts cirros@$2 ping -c $3 $4 2>/dev/null
 }
 
 function check_ping_from_vm() {
@@ -145,13 +155,16 @@ for ((i=1; i<=10; i++)); do
   old_master_snat_guid=$master_snat_guid
   openstack network agent set --disable $master_snat_guid
   sleep 5
-  print_vxlan
   while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still work   $(date)"
     sleep 1
+    detect_master_snat || /bin/true
+    if [[ -n "$master_snat" && "$master_snat" != "$old_master_snat" ]]; then
+      echo "INFO: master SNAT has been moved. But ping doesn't catch it"
+      break
+    fi
   done
-  j=0
-  k=0
+  j=0; k=0
   while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still doensn't work   $(date)"
     sleep 1
@@ -162,13 +175,14 @@ for ((i=1; i<=10; i++)); do
         echo "ERROR: connection was not restored."
         exit 1
       fi
-      echo "WARNING: restoring connection is too long. enable disabled: $master_snat and disable current master"
-      openstack network agent set --enable $master_snat_guid
-      detect_master_snat
+      print_vxlan
+      echo "WARNING: restoring connection is too long. enable disabled: $old_master_snat and disable current master"
+      openstack network agent set --enable $old_master_snat_guid
+      detect_master_snat || /bin/true ; get_master_snat_attributes
       openstack network agent set --disable $master_snat_guid
     fi
   done
-  detect_master_snat
+  wait_for_master_snat
   echo "INFO: enable SNAT back for backup role (machine $old_master_snat)   $(date)"
   openstack network agent set --enable $old_master_snat_guid
   echo "INFO: waiting a minute before next try   $(date)"
