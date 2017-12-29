@@ -138,7 +138,7 @@ function configure_l3_routing() {
   sed -i -e "s/{{public_gateway}}/$public_network_addr.1/g" $tmpf
   juju-scp $HOME/neutron-router-helper.tgz $mch:
   juju-scp $tmpf $mch:neutron-router-helper.yaml 2>/dev/null
-  juju-ssh $mch "tar -xf neutron-router-helper.tgz ; cd neutron-router-helper-master ; sudo PBR_VERSION='0.1.0' python setup.py install --install-scripts=/usr/local/bin &>/dev/null" 2>/dev/null
+  juju-ssh $mch "tar -xf neutron-router-helper.tgz ; cd neutron-router-helper-master ; sudo PBR_VERSION='0.1.0' python setup.py install --install-scripts=/usr/bin &>/dev/null" 2>/dev/null
   juju-ssh $mch "sudo mv neutron-router-helper.yaml /etc/neutron/neutron-router-helper.yaml" 2>/dev/null
   juju-ssh $mch "sudo systemctl daemon-reload ; sudo systemctl start neutron-router-helper.timer ; sudo systemctl restart rsyslog" 2>/dev/null
 }

@@ -151,16 +151,21 @@ for ((i=1; i<=10; i++)); do
     sleep 1
   done
   j=0
+  k=0
   while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still doensn't work   $(date)"
     sleep 1
     ((++j))
     if ((j > 80)); then
-      j=0
-      echo "WARNING: restoring connection is too long. do ovs emer-reset on current SNAT master"
-      # maybe it's better to disable/enable this master
+      j=0; ((++k));
+      if ((k > 10)); then
+        echo "ERROR: connection was not restored."
+        exit 1
+      fi
+      echo "WARNING: restoring connection is too long. enable disabled: $master_snat and disable current master"
+      openstack network agent set --enable $master_snat_guid
       detect_master_snat
-      juju-ssh $master_snat sudo ovs-vsctl emer-reset
+      openstack network agent set --disable $master_snat_guid
     fi
   done
   detect_master_snat
