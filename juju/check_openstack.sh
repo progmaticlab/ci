@@ -152,7 +152,8 @@ for ((i=1; i<=10; i++)); do
   echo "INFO: disable master SNAT (machine $master_snat) and check moving to another network node (test $i/10)   -------------------------------------------- $(date)"
   old_master_snat=$master_snat
   old_master_snat_guid=$master_snat_guid
-  openstack network agent set --disable $master_snat_guid
+  openstack network agent set --disable $old_master_snat_guid
+
   sleep 5
   while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still work   $(date)"
@@ -163,9 +164,10 @@ for ((i=1; i<=10; i++)); do
       break
     fi
   done
+
   j=0; k=0
   while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
-    echo "INFO: ping to external world still doensn't work   $(date)"
+    echo "INFO: ping to external world still doensn't work ($j/80)   $(date)"
     sleep 1
     ((++j))
     if ((j > 80)); then
@@ -174,14 +176,23 @@ for ((i=1; i<=10; i++)); do
         echo "ERROR: connection was not restored."
         exit 1
       fi
+      echo "WARNING: restoring connection is too long ($j/10)"
+      echo "INFO: vxlan info:"
       print_vxlan
-      echo "WARNING: restoring connection is too long. enable disabled: $old_master_snat and disable current master"
+      echo "INFO: latest BGP annnoucements:"
+      juju-ssh $bgp1 tail -3 /var/log/bird.log 2>/dev/null
+      echo "INFO:enable disabled master SNAT (machine $old_master_snat)"
       openstack network agent set --enable $old_master_snat_guid
+
       detect_master_snat || /bin/true ; get_master_snat_attributes
+      echo "INFO: current master SNAT is machine $master_snat, disable it."
+      old_master_snat=$master_snat
+      old_master_snat_guid=$master_snat_guid
       openstack network agent set --disable $master_snat_guid
     fi
   done
-  wait_for_master_snat
+
+  detect_master_snat ; get_master_snat_attributes
   echo "INFO: enable SNAT back for backup role (machine $old_master_snat)   $(date)"
   openstack network agent set --enable $old_master_snat_guid
   echo "INFO: waiting a minute before next try   $(date)"
