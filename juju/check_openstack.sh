@@ -73,11 +73,10 @@ function wait_for_master_snat() {
   local ii=0
   for ((ii=0; ii<60; ii++)); do
     if detect_master_snat ; then
-        get_master_snat_attributes
-        echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
-        return
-      fi
-    done
+      get_master_snat_attributes
+      echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
+      return
+    fi
     echo "WARNING: There is no master SNAT namespace on network nodes...   $(date)"
     sleep 10
   done
