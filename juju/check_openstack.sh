@@ -178,11 +178,11 @@ for ((i=1; i<=10; i++)); do
     sleep 1
     ((++j))
     if ((j > 80)); then
-      j=0; ((++k));
-      if ((k > 10)); then
+      #j=0; ((++k));
+      #if ((k > 10)); then
         echo "ERROR: connection was not restored."
         exit 1
-      fi
+      #fi
       echo "WARNING: restoring connection is too long ($j/10)"
       echo "INFO: vxlan info:"
       print_vxlan
