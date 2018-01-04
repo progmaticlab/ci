@@ -17,7 +17,7 @@ function catch_errors_ce() {
 
 # clone own neutron-gateway charm
 pushd $WORKSPACE
-git https://github.com/progmaticlab/charm-neutron-gateway.git
+git clone https://github.com/progmaticlab/charm-neutron-gateway.git
 popd
 
 comp1_ip="$network_addr.$os_comp_1_idx"
