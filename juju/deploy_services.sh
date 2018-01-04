@@ -17,6 +17,7 @@ function catch_errors_ce() {
 
 # clone own neutron-gateway charm
 pushd $WORKSPACE
+rm -rf charm-neutron-gateway
 git clone https://github.com/progmaticlab/charm-neutron-gateway.git
 popd
 
