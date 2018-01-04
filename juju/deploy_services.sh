@@ -15,6 +15,11 @@ function catch_errors_ce() {
   exit $exit_code
 }
 
+# clone own neutron-gateway charm
+pushd $WORKSPACE
+git https://github.com/progmaticlab/charm-neutron-gateway.git
+popd
+
 comp1_ip="$network_addr.$os_comp_1_idx"
 comp1=`get_machine_by_ip $comp1_ip`
 echo "INFO: compute 1: $comp1 / $comp1_ip"
@@ -70,14 +75,14 @@ juju-add-unit nova-compute --to $comp2
 juju-set nova-compute "openstack-origin=$OPENSTACK_ORIGIN" "virt-type=kvm" "enable-resize=True" "enable-live-migration=True" "migration-auth-type=ssh"
 
 juju-deploy cs:xenial/neutron-api --to lxd:$cont0
-juju-set neutron-api "openstack-origin=$OPENSTACK_ORIGIN" "enable-dvr=true" "overlay-network-type=vxlan" "enable-l3ha=True" "neutron-security-groups=True" "flat-network-providers=*" "max-l3-agents-per-router=3" "rpc-response-timeout=180"
+juju-set neutron-api "openstack-origin=$OPENSTACK_ORIGIN" "enable-dvr=true" "overlay-network-type=vxlan" "enable-l3ha=True" "neutron-security-groups=True" "flat-network-providers=*" "max-l3-agents-per-router=3"
 juju-set nova-cloud-controller "network-manager=Neutron"
 juju-expose neutron-api
 
-juju-deploy neutron-openvswitch
+juju-deploy cs:xenial/neutron-openvswitch
 juju-set neutron-openvswitch "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 
-juju-deploy neutron-gateway --to $net1
+juju-deploy --series=xenial $WORKSPACE/charm-neutron-gateway --to $net1
 juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
