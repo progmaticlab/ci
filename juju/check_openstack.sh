@@ -68,13 +68,17 @@ function get_master_snat_attributes() {
   master_snat_guid=`openstack network agent list --agent-type l3 | grep " $master_snat_name " | awk '{print $2}'`
 }
 
+function print_master_snat() {
+  echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
+}
+
 function wait_for_master_snat() {
   echo "INFO: try to find where is master node for SNAT namespace   $(date)"
   local ii=0
   for ((ii=0; ii<60; ii++)); do
     if detect_master_snat ; then
       get_master_snat_attributes
-      echo "INFO: master SNAT namespace has been found on machine $mch; ip $master_snat_ip; name $master_snat_name; guid $master_snat_guid   $(date)"
+      print_master_snat
       return
     fi
     echo "WARNING: There is no master SNAT namespace on network nodes...   $(date)"
@@ -172,6 +176,10 @@ for ((i=1; i<=10; i++)); do
     echo "INFO: master SNAT hasn't been moved. But ping doesn't work..."
   done
 
+  get_master_snat_attributes && print_master_snat
+  echo "INFO: enable SNAT back for backup role (machine $old_master_snat)   $(date)"
+  openstack network agent set --enable $old_master_snat_guid
+
   j=0
   while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still doensn't work ($j/80)   $(date)"
@@ -180,7 +188,8 @@ for ((i=1; i<=10; i++)); do
     if ((j == 40)); then
       echo "WARNING: restoring connection is very long"
       detect_master_snat || /bin/true ; get_master_snat_attributes
-      echo "INFO: current master SNAT is machine $master_snat  try to restart neutron-openvswitch-agent.service on it"
+      print_master_snat
+      echo "INFO: try to restart neutron-openvswitch-agent.service on master"
       juju-ssh $master_snat sudo systemctl restart neutron-openvswitch-agent.service
     fi
     if ((j > 80)); then
@@ -189,21 +198,16 @@ for ((i=1; i<=10; i++)); do
       print_vxlan
       echo "INFO: latest BGP annnoucements:"
       juju-ssh $bgp1 tail -10 /var/log/bird.log 2>/dev/null
-      echo "INFO:enable disabled master SNAT (machine $old_master_snat)"
-      openstack network agent set --enable $old_master_snat_guid
 
       detect_master_snat || /bin/true ; get_master_snat_attributes
-      echo "INFO: current master SNAT is machine $master_snat"
+      print_master_snat
 
       exit 1
     fi
   done
 
-  echo "INFO: enable SNAT back for backup role (machine $old_master_snat)   $(date)"
-  openstack network agent set --enable $old_master_snat_guid
   echo "INFO: waiting a minute before next try   $(date)"
   sleep 60
-  print_vxlan
-  # call wait_for just to detect all and print it
+  # call wait_for just to detect all attributes and print it
   wait_for_master_snat
 done
