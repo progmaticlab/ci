@@ -172,30 +172,30 @@ for ((i=1; i<=10; i++)); do
     echo "INFO: master SNAT hasn't been moved. But ping doesn't work..."
   done
 
-  j=0; k=0
+  j=0
   while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
     echo "INFO: ping to external world still doensn't work ($j/80)   $(date)"
     sleep 1
     ((++j))
+    if ((j > 40)); then
+      echo "WARNING: restoring connection is very long"
+      detect_master_snat || /bin/true ; get_master_snat_attributes
+      echo "INFO: current master SNAT is machine $master_snat  try to restart neutron-openvswitch-agent.service on it"
+      juju-ssh $master_snat sudo systemctl restart neutron-openvswitch-agent.service
+    fi
     if ((j > 80)); then
-      #j=0; ((++k));
-      #if ((k > 10)); then
-        echo "ERROR: connection was not restored."
-        exit 1
-      #fi
-      echo "WARNING: restoring connection is too long ($j/10)"
+      echo "ERROR: connection has not been restored."
       echo "INFO: vxlan info:"
       print_vxlan
       echo "INFO: latest BGP annnoucements:"
-      juju-ssh $bgp1 tail -3 /var/log/bird.log 2>/dev/null
+      juju-ssh $bgp1 tail -10 /var/log/bird.log 2>/dev/null
       echo "INFO:enable disabled master SNAT (machine $old_master_snat)"
       openstack network agent set --enable $old_master_snat_guid
 
       detect_master_snat || /bin/true ; get_master_snat_attributes
-      echo "INFO: current master SNAT is machine $master_snat, disable it."
-      old_master_snat=$master_snat
-      old_master_snat_guid=$master_snat_guid
-      openstack network agent set --disable $master_snat_guid
+      echo "INFO: current master SNAT is machine $master_snat"
+
+      exit 1
     fi
   done
 
