@@ -177,7 +177,7 @@ for ((i=1; i<=10; i++)); do
     echo "INFO: ping to external world still doensn't work ($j/80)   $(date)"
     sleep 1
     ((++j))
-    if ((j > 40)); then
+    if ((j == 40)); then
       echo "WARNING: restoring connection is very long"
       detect_master_snat || /bin/true ; get_master_snat_attributes
       echo "INFO: current master SNAT is machine $master_snat  try to restart neutron-openvswitch-agent.service on it"
