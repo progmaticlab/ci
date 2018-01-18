@@ -28,7 +28,7 @@ def _notify_neutron():
 
 @hooks.hook('install')
 def install():
-    apt_install(['cinder-backup', 'botocore'], fatal=True)
+    apt_install(['cinder-backup', 'python-botocore'], fatal=True)
     shutil.copy("files/s3.py", "/usr/lib/python2.7/dist-packages/cinder/backup/drivers/")
 
 
