@@ -71,7 +71,7 @@ juju-deploy cs:xenial/cinder --to lxd:$cont0
 juju-set cinder "openstack-origin=$OPENSTACK_ORIGIN" "glance-api-version=2"
 juju-expose cinder
 juju-deploy --series=xenial $my_dir/cinder-backup-s3
-juju-set cinder-backup-s3 "openstack-origin=$OPENSTACK_ORIGIN" "s3-url=http://ib.bizmrg.com"
+juju-set cinder-backup-s3 "s3-url=http://ib.bizmrg.com"
 
 juju-deploy cs:xenial/keystone --to lxd:$cont0
 juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
