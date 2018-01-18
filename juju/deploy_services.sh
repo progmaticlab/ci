@@ -69,8 +69,8 @@ juju-expose glance
 
 cat >cinder.cfg <<END
 cinder:
-block-device: sdb
-overwrite: true
+  block-device: "sdb"
+  overwrite: "true"
 END
 juju-deploy cs:xenial/cinder --config=cinder.cfg --to lxd:$cont0
 juju-set cinder "openstack-origin=$OPENSTACK_ORIGIN" "glance-api-version=2"
