@@ -111,7 +111,7 @@ juju-add-relation "nova-cloud-controller" "cinder"
 juju-add-relation "openstack-dashboard" "keystone"
 juju-add-relation "cinder:identity-service" "keystone:identity-service"
 juju-add-relation "cinder:amqp" "rabbitmq-server:amqp"
-juju-add-relation "cinder" "glance"
+juju-add-relation "cinder:image-service" "glance:image-service"
 
 juju-add-relation "neutron-api:shared-db" "mysql:shared-db"
 juju-add-relation "neutron-api:neutron-api" "nova-cloud-controller:neutron-api"
