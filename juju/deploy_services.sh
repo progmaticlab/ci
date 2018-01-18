@@ -67,7 +67,12 @@ juju-deploy cs:xenial/glance --to lxd:$cont0
 juju-set glance "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose glance
 
-juju-deploy cs:xenial/cinder --to lxd:$cont0
+cat >cinder.cfg <<END
+cinder:
+block-device: sdb
+overwrite: true
+END
+juju-deploy cs:xenial/cinder --config=cinder.cfg --to lxd:$cont0
 juju-set cinder "openstack-origin=$OPENSTACK_ORIGIN" "glance-api-version=2"
 juju-expose cinder
 juju-deploy --series=xenial $my_dir/cinder-backup-s3

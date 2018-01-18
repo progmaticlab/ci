@@ -30,6 +30,12 @@ function run_machine() {
   local ram="$3"
   local mac_suffix="$4"
   local ip=$5
+  local disk_path="$6"
+
+  local disk_opts=''
+  if [[ -n "$disk_path" ]]; then
+    disk_opts="--disk path=$disk_path,cache=writeback,bus=virtio,serial=$(uuidgen)"
+  fi
 
   echo "INFO: running machine $name $(date)"
   cp "$base_image" $pool_path/$name.qcow2
@@ -41,6 +47,7 @@ function run_machine() {
     --os-type=linux \
     --os-variant ubuntu16.04 \
     --disk path=$pool_path/$name.qcow2,cache=writeback,bus=virtio,serial=$(uuidgen) \
+    $disk_opts \
     --noautoconsole \
     --graphics vnc,listen=0.0.0.0 \
     --network network=$network_name,model=e1000,mac=$mac_base:$mac_suffix \
@@ -84,7 +91,12 @@ function run_cloud_machine() {
   local ip="$network_addr.$mac_suffix"
   local name="${job_prefix}-${prefix}-${index}"
 
-  run_machine $name $cpu $mem $mac_suffix $ip
+  local disk_path=''
+  if [[ "$prefix" == "cont" ]]; then
+    disk_path="$pool_path/$name-store.qcow2"
+    qemu-img create -f qcow2 -o preallocation=metadata "$disk_path" 25G
+  fi
+  run_machine $name $cpu $mem $mac_suffix $ip $disk_path
   echo "INFO: start machine waiting: $name $(date)"
   wait_kvm_machine $image_user@$ip
   echo "INFO: adding machine $name to juju controller $(date)"
