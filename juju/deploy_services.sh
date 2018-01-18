@@ -70,6 +70,8 @@ juju-expose glance
 juju-deploy cs:xenial/cinder --to lxd:$cont0
 juju-set cinder "openstack-origin=$OPENSTACK_ORIGIN" "glance-api-version=2"
 juju-expose cinder
+juju-deploy --series=xenial $my_dir/cinder-backup-s3
+juju-set cinder-backup-s3 "openstack-origin=$OPENSTACK_ORIGIN" "s3-url=http://ib.bizmrg.com"
 
 juju-deploy cs:xenial/keystone --to lxd:$cont0
 juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
@@ -112,6 +114,7 @@ juju-add-relation "openstack-dashboard" "keystone"
 juju-add-relation "cinder:identity-service" "keystone:identity-service"
 juju-add-relation "cinder:amqp" "rabbitmq-server:amqp"
 juju-add-relation "cinder:image-service" "glance:image-service"
+juju-add-relation "cinder" "cinder-backup-s3"
 
 juju-add-relation "neutron-api:shared-db" "mysql:shared-db"
 juju-add-relation "neutron-api:neutron-api" "nova-cloud-controller:neutron-api"

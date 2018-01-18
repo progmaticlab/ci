@@ -1,0 +1,19 @@
+name: cinder-backup-s3
+summary: Provides configuration for s3 backup backend to cinder
+maintainer: Andrey Pavlov <andrey.mp@gmail.com>
+description: |
+ Provides configuration for s3 backup backend to cinder
+categories:
+  - openstack
+series:
+  - xenial
+  - trusty
+subordinate: true
+provides:
+  backup-backend:
+    interface: cinder-backup
+    scope: container
+requires:
+  juju-info:
+    interface: juju-info
+    scope: container

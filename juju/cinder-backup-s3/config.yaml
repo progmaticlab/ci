@@ -1,0 +1,4 @@
+options:
+  s3-url:
+    type: string
+    description: URL for backup
