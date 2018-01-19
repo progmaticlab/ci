@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import json
-import os
 import shutil
 import sys
 
@@ -30,7 +29,7 @@ def _notify_neutron():
 @hooks.hook('install')
 def install():
     apt_install(['cinder-backup', 'python-botocore'], fatal=True)
-    drv = os.path.join(os.environ['HOME'], 's3.py')
+    drv = '/home/ubuntu/s3.py'
     shutil.copy(drv, '/usr/lib/python2.7/dist-packages/cinder/backup/drivers/')
 
 
