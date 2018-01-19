@@ -9,8 +9,26 @@ cd $WORKSPACE
 source $WORKSPACE/stackrc
 source .venv/bin/activate
 
-# just run 4 machines
+ssh_opts='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5'
+cont0=`get_machine_by_ip $network_addr.$os_cont_0_idx`
+comp1=`get_machine_by_ip $network_addr.$os_comp_1_idx`
+comp2=`get_machine_by_ip $network_addr.$os_comp_2_idx`
+net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
+net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
+net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
+
+# creates all objects in demo project
 export OS_PROJECT_NAME=demo
+
+# create test volume
+echo "INFO: create test volume and list volumes then"
+openstack volume create --size 1 test_volume
+sleep 10
+openstack volume list
+echo "INFO: check block devices in cinder machine"
+juju-ssh $cont0 lsblk
+
+# just run 4 machines
 need_wait=0
 if ! openstack server list | grep -q " vmp1-" ; then
   openstack server create --image cirros --flavor small --network private1 --min 2 --max 2 vmp1
@@ -30,17 +48,11 @@ if openstack server list | grep -q ERROR ; then
   echo "ERROR: VM-s were not up"
   exit 1
 fi
+
+# all other checks will be with admin project
 export OS_PROJECT_NAME=admin
 
-# and test ...
-cont0=`get_machine_by_ip $network_addr.$os_cont_0_idx`
-comp1=`get_machine_by_ip $network_addr.$os_comp_1_idx`
-comp2=`get_machine_by_ip $network_addr.$os_comp_2_idx`
-net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
-net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
-net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
-
-ssh_opts='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5'
+# and test it all...
 # router id -> for snat and qrouter namespaces
 r_id=`openstack router show rt | awk '/ id /{print $4}'`
 echo "INFO: snat/qrouter namespace id: $r_id"
