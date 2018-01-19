@@ -135,15 +135,16 @@ function configure_l3_routing() {
   sed -i -e "s/{{public_iface}}/$brex_iface/g" $tmpf
   sed -i -e "s|{{public_cidr}}|$public_network_addr.0/24|g" $tmpf
   sed -i -e "s/{{public_gateway}}/$public_network_addr.1/g" $tmpf
-  juju-scp $HOME/neutron-router-helper.tgz $mch:
+  juju-scp $HOME/files/neutron-router-helper.tgz $mch:
   juju-scp $tmpf $mch:neutron-router-helper.yaml 2>/dev/null
   juju-ssh $mch "tar -xf neutron-router-helper.tgz ; cd neutron-router-helper-master ; sudo PBR_VERSION='0.1.0' python setup.py install --install-scripts=/usr/bin &>/dev/null" 2>/dev/null
   juju-ssh $mch "sudo mv neutron-router-helper.yaml /etc/neutron/neutron-router-helper.yaml" 2>/dev/null
   juju-ssh $mch "sudo systemctl daemon-reload ; sudo systemctl start neutron-router-helper.timer ; sudo systemctl restart rsyslog" 2>/dev/null
+  rm "$tmpf"
 }
 
 function _install_dr() {
-  juju-scp $HOME/neutron-dynamic-routing.tgz $mch:
+  juju-scp $HOME/files/neutron-dynamic-routing.tgz $mch:
   juju-ssh $mch "tar -xf neutron-dynamic-routing.tgz ; cd neutron-dynamic-routing ; git checkout 30a9f0b ; sudo python setup.py install --install-scripts=/usr/bin --install-data=/ &>/dev/null" 2>/dev/null
 }
 
@@ -164,6 +165,7 @@ EOS
   juju-scp $my_dir/files/neutron-bgp-dragent.service $mch:neutron-bgp-dragent.service
   juju-ssh $mch "sudo mkdir -p /usr/lib/systemd/system ; sudo cp ./neutron-bgp-dragent.service /usr/lib/systemd/system/neutron-bgp-dragent.service" 2>/dev/null
   juju-ssh $mch "sudo cp ./bgp_dragent.ini /etc/neutron/bgp_dragent.ini ; sudo chmod 644 /etc/neutron/bgp_dragent.ini ; sudo systemctl start neutron-bgp-dragent.service" 2>/dev/null
+  rm "$ftmp"
 }
 
 function configure_bgp_neutron_api() {
