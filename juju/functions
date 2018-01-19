@@ -19,6 +19,7 @@ mac_base='52:54:00:10:00'
 # juju controller
 cont_idx='99'
 # openstack components (controllers + rabbit + db)
+# also this machine for bird (emulates bgp switch)
 os_cont_0_idx='10'
 # network nodes
 os_net_1_idx='20'
@@ -27,8 +28,6 @@ os_net_3_idx='22'
 # openstack compute
 os_comp_1_idx='30'
 os_comp_2_idx='31'
-# machine with bird (emulates bgp switch)
-os_bgp_1_idx='50'
 
 # openstack definitions
 public_network_addr="10.10.0"
@@ -128,7 +127,7 @@ function configure_l3_routing() {
   juju-ssh $mch "sudo ip route add $public_network_addr.0/24 dev $brex_iface" 2>/dev/null
   # add route for all traffic from virtual zone to host's default gateway
   # TODO: detect iface for $network_addr.1
-  juju-ssh $mch "sudo ip rule add from all iif $brex_iface pref 10 table 120 ; sudo ip route add 0.0.0.0/0 table 120 via $network_addr.$os_bgp_1_idx dev ens3" 2>/dev/null
+  juju-ssh $mch "sudo ip rule add from all iif $brex_iface pref 10 table 120 ; sudo ip route add 0.0.0.0/0 table 120 via $network_addr.$os_cont_0_idx dev ens3" 2>/dev/null
 
   # copy & install neutron_router_helper
   tmpf=$(mktemp)

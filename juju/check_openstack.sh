@@ -33,12 +33,12 @@ fi
 export OS_PROJECT_NAME=admin
 
 # and test ...
+cont0=`get_machine_by_ip $network_addr.$os_cont_0_idx`
 comp1=`get_machine_by_ip $network_addr.$os_comp_1_idx`
 comp2=`get_machine_by_ip $network_addr.$os_comp_2_idx`
 net1=`get_machine_by_ip $network_addr.$os_net_1_idx`
 net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
 net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
-bgp1=`get_machine_by_ip $network_addr.$os_bgp_1_idx`
 
 ssh_opts='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5'
 # router id -> for snat and qrouter namespaces
@@ -93,7 +93,7 @@ wait_for_master_snat
 
 echo "INFO: waiting for bgp announcement on router host   $(date)"
 for ((i=0; i<180; i++)); do
-  if juju-ssh $bgp1 tail -3 /var/log/bird.log 2>/dev/null | grep "neutron > added .* $master_snat_ip" ; then
+  if juju-ssh $cont0 tail -3 /var/log/bird.log 2>/dev/null | grep "neutron > added .* $master_snat_ip" ; then
     echo "INFO: bgp announcement was found   $(date)"
     break
   fi
@@ -143,10 +143,10 @@ check_ping_from_vm "vmp1-1" ${vms["vmp2-1"]}
 check_ping_from_vm "vmp1-1" ${vms["vmp2-2"]}
 
 # check north-south traffic by pinging external router (external world) from vm-s without floating ip
-check_ping_from_vm "vmp1-1" $network_addr.$os_bgp_1_idx
-check_ping_from_vm "vmp1-2" $network_addr.$os_bgp_1_idx
-check_ping_from_vm "vmp2-1" $network_addr.$os_bgp_1_idx
-check_ping_from_vm "vmp2-2" $network_addr.$os_bgp_1_idx
+check_ping_from_vm "vmp1-1" $network_addr.$os_cont_0_idx
+check_ping_from_vm "vmp1-2" $network_addr.$os_cont_0_idx
+check_ping_from_vm "vmp2-1" $network_addr.$os_cont_0_idx
+check_ping_from_vm "vmp2-2" $network_addr.$os_cont_0_idx
 
 print_vxlan
 # check master SNAT namespace moving... do it for one any vm
@@ -160,7 +160,7 @@ for ((i=1; i<=10; i++)); do
   sleep 5
 
   while /bin/true ; do
-    while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
+    while _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_cont_0_idx &>/dev/null ; do
       echo "INFO: ping to external world still work   $(date)"
       sleep 1
       detect_master_snat || /bin/true
@@ -181,7 +181,7 @@ for ((i=1; i<=10; i++)); do
   openstack network agent set --enable $old_master_snat_guid
 
   j=0
-  while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_bgp_1_idx &>/dev/null ; do
+  while ! _ping $compute ${vms["$vm_name"]} 1 $network_addr.$os_cont_0_idx &>/dev/null ; do
     echo "INFO: ping to external world still doensn't work ($j/80)   $(date)"
     sleep 1
     ((++j))
@@ -197,7 +197,7 @@ for ((i=1; i<=10; i++)); do
       echo "INFO: vxlan info:"
       print_vxlan
       echo "INFO: latest BGP annnoucements:"
-      juju-ssh $bgp1 tail -10 /var/log/bird.log 2>/dev/null
+      juju-ssh $cont0 tail -10 /var/log/bird.log 2>/dev/null
 
       detect_master_snat || /bin/true ; get_master_snat_attributes
       print_master_snat

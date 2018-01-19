@@ -78,7 +78,6 @@ declare -A pkgs
 pkgs["cont"]="mc wget bridge-utils"
 pkgs["comp"]="mc wget openvswitch-switch sshpass"
 pkgs["net"]="mc wget openvswitch-switch"
-pkgs["bgp"]="mc wget"
 
 function run_cloud_machine() {
   local prefix=$1
@@ -150,8 +149,6 @@ run_cloud_machine comp 2 $compute_cpu $compute_mem
 run_cloud_machine net 1 $network_cpu $network_mem
 run_cloud_machine net 2 $network_cpu $network_mem
 run_cloud_machine net 3 $network_cpu $network_mem
-# create and run machine for router emulator
-run_cloud_machine bgp 1 $router_cpu $router_mem
 
 # wait for all machines are up
 wait_for_all_machines
