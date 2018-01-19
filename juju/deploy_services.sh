@@ -43,7 +43,7 @@ net3=`get_machine_by_ip $net3_ip`
 echo "INFO: network 1: $net3 / $net3_ip"
 
 # OpenStack base
-juju-ssh $HOME/files/s3.py $cont0:s3.py
+juju-scp $HOME/files/s3.py $cont0:s3.py
 
 echo "INFO: Deploy all $(date)"
 juju-deploy cs:xenial/ntp
