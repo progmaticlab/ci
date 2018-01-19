@@ -65,7 +65,7 @@ juju-expose glance
 
 cat >cinder.cfg <<END
 cinder:
-  block-device: "sdb"
+  block-device: "vdb"
   overwrite: "true"
 END
 juju-deploy cs:xenial/cinder --config=cinder.cfg --to $cont0
