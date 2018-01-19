@@ -2,6 +2,7 @@
 
 neutron_bgp_speaker_ip=$1
 local_ip=$(hostname -i)
+iface=$(route | awk '/default/{print $NF}'|head -1)
 
 apt-get install -y bird
 systemctl stop bird
@@ -16,7 +17,7 @@ define myas = 65432;
 router id $local_ip;
 
 protocol direct jovs {
-  interface "ens3";
+  interface "$iface";
 }
 
 protocol device {
