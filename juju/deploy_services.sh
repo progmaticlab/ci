@@ -53,7 +53,7 @@ juju-deploy cs:xenial/percona-cluster mysql --to lxd:$cont0
 juju-set mysql "root-password=${PASSWORD:-password}" "max-connections=1500"
 
 juju-deploy cs:xenial/openstack-dashboard --to lxd:$cont0
-juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN"
+juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
 juju-expose openstack-dashboard
 
 juju-deploy cs:xenial/nova-cloud-controller --to lxd:$cont0
