@@ -17,8 +17,9 @@ pip install python-openstackclient python-neutronclient
 
 openstack catalog list
 
-openstack project create demo
-openstack role add --project demo --user admin Member
+openstack project create --domain default demo
+openstack user create --project demo --domain default --password ${PASSWORD:-password} demo
+openstack role add --project demo --user demo --user-domain default --project-domain default Member
 
 sleep 30
 
@@ -42,7 +43,10 @@ openstack bgp peer create --remote-as 65432 --peer-ip $network_addr.$os_cont_0_i
 openstack bgp speaker add peer bgpspeaker kvm
 for iii in `openstack network agent list | grep BGP | awk '{print $2}'` ; do openstack bgp dragent add speaker $iii bgpspeaker ; done
 
+export OS_USERNAME=demo
 export OS_PROJECT_NAME=demo
+export OS_PROJECT_DOMAIN_NAME=default
+export OS_USER_DOMAIN_NAME=default
 
 openstack network create private1
 openstack subnet create --network private1 --subnet-range 192.168.1.0/24 --gateway 192.168.1.1 private1
@@ -58,6 +62,6 @@ openstack router add subnet rt private2
 openstack security group rule create default --protocol icmp
 openstack security group rule create default --protocol tcp --dst-port 22:22
 
-export OS_PROJECT_NAME=admin
+source $WORKSPACE/stackrc
 
 for iii in `openstack network agent list | grep BGP | awk '{print $2}'` ; do openstack network agent show $iii ; done
