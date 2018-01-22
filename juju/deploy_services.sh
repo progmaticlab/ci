@@ -76,7 +76,7 @@ juju-deploy --series=xenial $my_dir/cinder-backup-s3
 juju-set cinder-backup-s3 "s3-url=http://ib.bizmrg.com"
 
 juju-deploy cs:xenial/keystone --to lxd:$cont0
-juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN"
+juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN" "preferred-api-version=3"
 juju-expose keystone
 
 juju-deploy cs:xenial/nova-compute --to $comp1
