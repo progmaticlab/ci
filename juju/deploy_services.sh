@@ -15,10 +15,13 @@ function catch_errors_ce() {
   exit $exit_code
 }
 
-# clone own neutron-gateway charm
 pushd $WORKSPACE
+# clone own neutron-gateway charm due to inconsistent plugin list in it
 rm -rf charm-neutron-gateway
 git clone https://github.com/progmaticlab/charm-neutron-gateway.git
+# clone own keystone charm due to updated policies for *_credential methods
+rm -rf charm-keystone
+git clone https://github.com/progmaticlab/charm-keystone.git
 popd
 
 cont0_ip="$network_addr.$os_cont_0_idx"
@@ -75,7 +78,7 @@ juju-expose cinder
 juju-deploy --series=xenial $my_dir/cinder-backup-s3
 juju-set cinder-backup-s3 "s3-url=http://ib.bizmrg.com"
 
-juju-deploy cs:xenial/keystone --to lxd:$cont0
+juju-deploy --series=xenial $WORKSPACE/charm-keystone --to lxd:$cont0
 juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN" "preferred-api-version=3"
 juju-expose keystone
 
