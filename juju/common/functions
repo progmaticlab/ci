@@ -77,12 +77,12 @@ function get_machine_ip() {
 }
 
 function get_machine_ip_by_machine() {
-  juju machines $juju_model_arg | grep "^$1" | awk '{print $3}'
+  juju machines $juju_model_arg | grep "^$1" | head -1  | awk '{print $3}'
 }
 
 function get_machine_by_ip() {
   local ip=$1
-  juju machines $juju_model_arg | grep $ip | awk '{print $1}'
+  juju machines $juju_model_arg | grep " $ip " | head -1  | awk '{print $1}'
 }
 
 function wait_absence_status_for_services() {
