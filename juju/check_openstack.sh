@@ -18,7 +18,10 @@ net2=`get_machine_by_ip $network_addr.$os_net_2_idx`
 net3=`get_machine_by_ip $network_addr.$os_net_3_idx`
 
 # creates all objects in demo project
+export OS_USERNAME=demo
 export OS_PROJECT_NAME=demo
+export OS_PROJECT_DOMAIN_NAME=default
+export OS_USER_DOMAIN_NAME=default
 
 # create test volume
 echo "INFO: create test volume and list volumes then"
@@ -50,7 +53,7 @@ if openstack server list | grep -q ERROR ; then
 fi
 
 # all other checks will be with admin project
-export OS_PROJECT_NAME=admin
+source $WORKSPACE/stackrc
 
 # and test it all...
 # router id -> for snat and qrouter namespaces
