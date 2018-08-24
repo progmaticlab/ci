@@ -40,6 +40,7 @@ function run_machine() {
   echo "INFO: running machine $name $(date)"
   cp "$base_image" $pool_path/$name.qcow2
   virt-install --name $name \
+    --memorybacking hugepages=on \
     --ram $ram \
     --vcpus $cpu \
     --cpu host \
