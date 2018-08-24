@@ -38,9 +38,9 @@ brex_port='dummy0'
 controller_cpu=4
 controller_mem=12288
 compute_cpu=4
-compute_mem=4096
+compute_mem=6144
 network_cpu=2
-network_mem=3210
+network_mem=6144
 
 # definitions for KVM/virsh:
 export LIBVIRT_DEFAULT_URI=qemu:///system

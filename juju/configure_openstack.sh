@@ -32,7 +32,7 @@ openstack subnet create --network public --subnet-range $public_network_addr.0/2
 
 openstack flavor create --ram 256 --vcpus 1 --public small
 
-rm cirros-0.3.5-x86_64-disk.img
+rm -f cirros-0.3.5-x86_64-disk.img
 wget -nv http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
 openstack image create --public --file cirros-0.3.5-x86_64-disk.img cirros
 
