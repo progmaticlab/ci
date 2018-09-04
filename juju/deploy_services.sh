@@ -141,9 +141,9 @@ juju-add-relation "neutron-openvswitch" "rabbitmq-server"
 
 post_deploy
 
-juju-scp $HOME/files/forms.py openstack-dashboard/0:forms.py
-juju-ssh openstack-dashboard/0 sudo cp -f ./forms.py /usr/share/openstack-dashboard/openstack_dashboard/dashboards/project/volumes/backups/
-juju-ssh openstack-dashboard/0 sudo systemctl restart apache2.service
+#juju-scp $HOME/files/forms.py openstack-dashboard/0:forms.py
+#juju-ssh openstack-dashboard/0 sudo cp -f ./forms.py /usr/share/openstack-dashboard/openstack_dashboard/dashboards/project/volumes/backups/
+#juju-ssh openstack-dashboard/0 sudo systemctl restart apache2.service
 
 # looks like that charms do not restart neutron services after config files were written
 restart_neutron $comp1
