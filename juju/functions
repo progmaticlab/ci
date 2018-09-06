@@ -142,8 +142,12 @@ function configure_l3_routing() {
 }
 
 function _install_dr() {
-  juju-scp $HOME/files/neutron-dynamic-routing.tgz $mch:
-  juju-ssh $mch "tar -xf neutron-dynamic-routing.tgz ; cd neutron-dynamic-routing ; git checkout 30a9f0b ; sudo python setup.py install --install-scripts=/usr/bin --install-data=/ &>/dev/null" 2>/dev/null
+  # for ocata
+  #juju-scp $HOME/files/neutron-dynamic-routing.tgz $mch:
+  #juju-ssh $mch "tar -xf neutron-dynamic-routing.tgz ; cd neutron-dynamic-routing ; git checkout 30a9f0b ; sudo python setup.py install --install-scripts=/usr/bin --install-data=/ &>/dev/null" 2>/dev/null
+
+  # for queens and further
+  juju-ssh $mch "git clone https://github.com/openstack/neutron-dynamic-routing -b stable/rocky ; cd neutron-dynamic-routing ; sudo python setup.py install --install-scripts=/usr/bin --install-data=/ &>/dev/null" 2>/dev/null
 }
 
 function _run_dr_agent() {

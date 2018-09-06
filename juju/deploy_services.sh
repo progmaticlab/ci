@@ -5,7 +5,7 @@ my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
 source "$my_dir/functions"
 
-OPENSTACK_ORIGIN="cloud:xenial-pike"
+OPENSTACK_ORIGIN="cloud:xenial-rocky"
 
 trap 'catch_errors_ce $LINENO' ERR EXIT
 function catch_errors_ce() {
