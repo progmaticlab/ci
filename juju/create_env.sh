@@ -111,6 +111,7 @@ function run_cloud_machine() {
   # install packages for node
   juju-ssh $mch "sudo apt-get -y purge unattended-upgrades" &>/dev/null
   juju-ssh $mch "sudo apt-get update" &>/dev/null
+  juju-ssh $mch "DEBIAN_FRONTEND=noninteractive sudo -E apt-get -fy -o Dpkg::Options::='--force-confnew' upgrade" &>/dev/null
   juju-ssh $mch "DEBIAN_FRONTEND=noninteractive sudo -E apt-get -fy install ${pkgs[$prefix]}" &>/dev/null
 
   if [[ "$prefix" == "cont" ]]; then
