@@ -76,7 +76,7 @@ function wait_kvm_machine() {
 }
 
 declare -A pkgs
-pkgs["cont"]="mc wget bridge-utils"
+pkgs["cont"]="mc wget bridge-utils lxd"
 pkgs["comp"]="mc wget openvswitch-switch sshpass"
 pkgs["net"]="mc wget openvswitch-switch"
 
@@ -108,20 +108,19 @@ function run_cloud_machine() {
   juju-ssh $mch "sudo bash -c 'echo $name > /etc/hostname ; hostname $name'" 2>/dev/null
   # after first boot we must remove cloud-init
   juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
-  # add some configuration for lxd 
-  juju-ssh $mch "echo 'supersede routers $network_addr.1;' | sudo tee -a /etc/dhcp/dhclient.conf"
   # install packages for node
-  juju-ssh $mch "sudo apt-get -fy install ${pkgs[$prefix]}" &>/dev/null
+  juju-ssh $mch "sudo apt-get -y purge unattended-upgrades" &>>$log_dir/apt.log
+  juju-ssh $mch "sudo apt-get update" &>>$log_dir/apt.log
+  juju-ssh $mch "DEBIAN_FRONTEND=noninteractive sudo -E apt-get -fy install ${pkgs[$prefix]}" &>/dev/null
+
   if [[ "$prefix" == "cont" ]]; then
-    juju-scp "$my_dir/files/50-cloud-init-controller-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
-    juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
-    # steps to allow deploy openstack in lxd containers by juju
-    juju-ssh $mch "sudo sed -i -e 's/^USE_LXD_BRIDGE.*$/USE_LXD_BRIDGE=\"false\"/m' /etc/default/lxd-bridge" 2>/dev/null
-    juju-ssh $mch "sudo sed -i -e 's/^LXD_BRIDGE.*$/LXD_BRIDGE=\"br-lxd\"/m' /etc/default/lxd-bridge" 2>/dev/null
+    juju-scp "$my_dir/files/__prepare-controller.sh" $mch:prepare-controller.sh 2>/dev/null
+    juju-ssh $mch "sudo ./prepare-controller.sh $network_addr"
   else
-    juju-scp "$my_dir/files/50-cloud-init-xenial.cfg" $mch:50-cloud-init.cfg 2>/dev/null
-    juju-ssh $mch "sudo cp ./50-cloud-init.cfg /etc/network/interfaces.d/50-cloud-init.cfg" 2>/dev/null
+    juju-scp "$my_dir/files/__prepare-compute.sh" $mch:prepare-compute.sh 2>/dev/null
+    juju-ssh $mch "sudo ./prepare-compute.sh $network_addr"
   fi
+
   # and reboot it to apply changes
   juju-ssh $mch "sudo reboot" 2>/dev/null || /bin/true
 }

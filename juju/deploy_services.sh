@@ -5,8 +5,6 @@ my_file="$(readlink -e "$0")"
 my_dir="$(dirname $my_file)"
 source "$my_dir/functions"
 
-OPENSTACK_ORIGIN="cloud:xenial-rocky"
-
 trap 'catch_errors_ce $LINENO' ERR EXIT
 function catch_errors_ce() {
   local exit_code=$?
@@ -49,21 +47,21 @@ echo "INFO: network 1: $net3 / $net3_ip"
 juju-scp $HOME/files/s3.py $cont0:s3.py
 
 echo "INFO: Deploy all $(date)"
-juju-deploy cs:xenial/ntp
+juju-deploy cs:$SERIES/ntp
 
-juju-deploy cs:xenial/rabbitmq-server --to lxd:$cont0
-juju-deploy cs:xenial/percona-cluster mysql --to lxd:$cont0
+juju-deploy cs:$SERIES/rabbitmq-server --to lxd:$cont0
+juju-deploy cs:$SERIES/percona-cluster mysql --to lxd:$cont0
 juju-set mysql "root-password=${PASSWORD:-password}" "max-connections=1500"
 
-juju-deploy cs:xenial/openstack-dashboard --to lxd:$cont0
+juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
 juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
 juju-expose openstack-dashboard
 
-juju-deploy cs:xenial/nova-cloud-controller --to lxd:$cont0
+juju-deploy cs:$SERIES/nova-cloud-controller --to lxd:$cont0
 juju-set nova-cloud-controller "console-access-protocol=novnc" "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose nova-cloud-controller
 
-juju-deploy cs:xenial/glance --to lxd:$cont0
+juju-deploy cs:$SERIES/glance --to lxd:$cont0
 juju-set glance "openstack-origin=$OPENSTACK_ORIGIN"
 juju-expose glance
 
@@ -72,34 +70,34 @@ cinder:
   block-device: "vdb"
   overwrite: "true"
 END
-juju-deploy cs:xenial/cinder --config=cinder.cfg --to $cont0
+juju-deploy cs:$SERIES/cinder --config=cinder.cfg --to $cont0
 juju-set cinder "openstack-origin=$OPENSTACK_ORIGIN" "glance-api-version=2"
 juju-expose cinder
-juju-deploy --series=xenial $my_dir/cinder-backup-s3
+juju-deploy --series=$SERIES $my_dir/cinder-backup-s3
 juju-set cinder-backup-s3 "s3-url=http://ib.bizmrg.com"
 
-juju-deploy --series=xenial $WORKSPACE/charm-keystone --to lxd:$cont0
+juju-deploy --series=$SERIES $WORKSPACE/charm-keystone --to lxd:$cont0
 juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN" "preferred-api-version=3"
 juju-expose keystone
 
-juju-deploy cs:xenial/nova-compute --to $comp1
+juju-deploy cs:$SERIES/nova-compute --to $comp1
 juju-add-unit nova-compute --to $comp2
 juju-set nova-compute "openstack-origin=$OPENSTACK_ORIGIN" "virt-type=kvm" "enable-resize=True" "enable-live-migration=True" "migration-auth-type=ssh"
 
-juju-deploy cs:xenial/neutron-api --to lxd:$cont0
+juju-deploy cs:$SERIES/neutron-api --to lxd:$cont0
 juju-set neutron-api "openstack-origin=$OPENSTACK_ORIGIN" "enable-dvr=true" "overlay-network-type=vxlan" "enable-l3ha=True" "neutron-security-groups=True" "flat-network-providers=*" "max-l3-agents-per-router=3"
 juju-set nova-cloud-controller "network-manager=Neutron"
 juju-expose neutron-api
 
-juju-deploy cs:xenial/neutron-openvswitch
+juju-deploy cs:$SERIES/neutron-openvswitch
 juju-set neutron-openvswitch "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 
-juju-deploy --series=xenial $WORKSPACE/charm-neutron-gateway --to $net1
+juju-deploy --series=$SERIES $WORKSPACE/charm-neutron-gateway --to $net1
 juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
 
-juju-deploy --series=xenial $my_dir/neutron-bgp
+juju-deploy --series=$SERIES $my_dir/neutron-bgp
 
 echo "INFO: Add relations $(date)"
 juju-add-relation "keystone:shared-db" "mysql:shared-db"

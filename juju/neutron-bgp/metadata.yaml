@@ -6,6 +6,7 @@ description: |
 categories:
   - openstack
 series:
+  - bionic
   - xenial
   - trusty
 subordinate: true

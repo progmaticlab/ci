@@ -22,6 +22,19 @@ if virsh list --all | grep -q "${job_prefix}-cont" ; then
   exit 1
 fi
 
+# check input params
+if [[ $SERIES == 'bionic' && $VERSION == 'queens' ]]; then
+  export OPENSTACK_ORIGIN='distro'
+elif [[ $SERIES == 'bionic' && $VERSION != 'pike') ]]; then
+  echo "ERROR: bionic supports only pike and further versions"
+  exit 1
+elif [[ $VERSION == 'rocky' && $SERIES == 'xenial' ]]; then
+  echo "ERROR: rocky is not available for xenial"
+  exit 1
+else
+  export OPENSTACK_ORIGIN="cloud:$SERIES-$VERSION"
+fi
+
 # set up trap to clean up environment
 trap 'catch_errors $LINENO' ERR EXIT
 function catch_errors() {
