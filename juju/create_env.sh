@@ -109,8 +109,8 @@ function run_cloud_machine() {
   # after first boot we must remove cloud-init
   juju-ssh $mch "sudo rm -rf /etc/systemd/system/cloud-init.target.wants /lib/systemd/system/cloud*"
   # install packages for node
-  juju-ssh $mch "sudo apt-get -y purge unattended-upgrades" &>>$log_dir/apt.log
-  juju-ssh $mch "sudo apt-get update" &>>$log_dir/apt.log
+  juju-ssh $mch "sudo apt-get -y purge unattended-upgrades" &>/dev/null
+  juju-ssh $mch "sudo apt-get update" &>/dev/null
   juju-ssh $mch "DEBIAN_FRONTEND=noninteractive sudo -E apt-get -fy install ${pkgs[$prefix]}" &>/dev/null
 
   if [[ "$prefix" == "cont" ]]; then
