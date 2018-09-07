@@ -99,6 +99,22 @@ juju-add-unit neutron-gateway --to $net3
 
 juju-deploy --series=$SERIES $my_dir/neutron-bgp
 
+# re-write resolv.conf for bionic lxd containers to allow names resolving inside lxd containers
+if [[ "$SERIES" == 'bionic' ]]; then
+  for mmch in `juju machines | awk '/lxd/{print $1}'` ; do
+    echo "INFO: apply DNS config for $mmch"
+    res=1
+    for i in 0 1 2 3 4 5 ; do
+      if juju-ssh $mmch "echo 'nameserver $addr.1' | sudo tee /usr/lib/systemd/resolv.conf ; sudo ln -sf /usr/lib/systemd/resolv.conf /etc/resolv.conf" ; then
+        res=0
+        break
+      fi
+      sleep 10
+    done
+    test $res -eq 0 || { echo "ERROR: Machine $mmch is not accessible"; exit 1; }
+  done
+fi
+
 echo "INFO: Add relations $(date)"
 juju-add-relation "keystone:shared-db" "mysql:shared-db"
 juju-add-relation "glance:shared-db" "mysql:shared-db"
@@ -123,7 +139,6 @@ juju-add-relation "neutron-api:neutron-api" "nova-cloud-controller:neutron-api"
 juju-add-relation "neutron-api:identity-service" "keystone:identity-service"
 juju-add-relation "neutron-api:amqp" "rabbitmq-server:amqp"
 
-juju-add-relation "neutron-api" "ntp"
 juju-add-relation "nova-compute:juju-info" "ntp:juju-info"
 juju-add-relation "neutron-gateway" "ntp"
 
