@@ -25,8 +25,8 @@ fi
 # check input params
 if [[ $SERIES == 'bionic' && $VERSION == 'queens' ]]; then
   export OPENSTACK_ORIGIN='distro'
-elif [[ $SERIES == 'bionic' && $VERSION != 'pike' ]]; then
-  echo "ERROR: bionic supports only pike and further versions"
+elif [[ $SERIES == 'bionic' && $VERSION != 'rocky' ]]; then
+  echo "ERROR: bionic supports only queens and further versions"
   exit 1
 elif [[ $VERSION == 'rocky' && $SERIES == 'xenial' ]]; then
   echo "ERROR: rocky is not available for xenial"
