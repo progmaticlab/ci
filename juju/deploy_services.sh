@@ -100,8 +100,7 @@ juju-add-unit neutron-gateway --to $net3
 juju-deploy --series=$SERIES $my_dir/neutron-bgp
 
 # wait for lxd containers
-sleep 60
-wait_for_all_machines
+wait_for_all_machines_lite
 # re-write resolv.conf for bionic lxd containers to allow names resolving inside lxd containers
 if [[ "$SERIES" == 'bionic' ]]; then
   for mmch in `juju machines | awk '/lxd/{print $1}'` ; do

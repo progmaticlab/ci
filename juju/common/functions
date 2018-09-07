@@ -115,13 +115,14 @@ function wait_absence_status_for_services() {
   done
 }
 
+wait_cmd=''
 function wait_for_machines() {
   # wait for machines
   sleep 30
   for machine in $@ ; do
     echo "Waiting for machine: $machine"
     local fail=0
-    while ! output=`juju-ssh $machine "sudo apt-get install -fy joe mc" 2>/dev/null` ; do
+    while ! output=`juju-ssh $machine "$wait_cmd" 2>/dev/null` ; do
       if ((fail >= 60)); then
         echo "ERROR: Machine $machine did not up."
         echo $output
@@ -152,6 +153,12 @@ function wait_for_machines() {
 }
 
 function wait_for_all_machines() {
+  wait_cmd='sudo apt-get install -fy joe mc'
+  wait_for_machines `juju-machines-tabular | tail -n +2 | awk '{print $1}'`
+}
+
+function wait_for_all_machines_lite() {
+  wait_cmd='uname -a'
   wait_for_machines `juju-machines-tabular | tail -n +2 | awk '{print $1}'`
 }
 
