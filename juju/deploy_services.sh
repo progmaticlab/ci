@@ -53,9 +53,9 @@ juju-deploy cs:$SERIES/rabbitmq-server --to lxd:$cont0
 juju-deploy cs:$SERIES/percona-cluster mysql --to lxd:$cont0
 juju-set mysql "root-password=${PASSWORD:-password}" "max-connections=1500"
 
-juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
-juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
-juju-expose openstack-dashboard
+#juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
+#juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
+#juju-expose openstack-dashboard
 
 juju-deploy cs:$SERIES/nova-cloud-controller --to lxd:$cont0
 juju-set nova-cloud-controller "console-access-protocol=novnc" "openstack-origin=$OPENSTACK_ORIGIN"
@@ -130,7 +130,7 @@ juju-add-relation "nova-compute:amqp" "rabbitmq-server:amqp"
 juju-add-relation "nova-cloud-controller:shared-db" "mysql:shared-db"
 juju-add-relation "nova-cloud-controller:amqp" "rabbitmq-server:amqp"
 juju-add-relation "nova-cloud-controller" "cinder"
-juju-add-relation "openstack-dashboard:identity-service" "keystone:identity-service"
+#juju-add-relation "openstack-dashboard:identity-service" "keystone:identity-service"
 juju-add-relation "cinder:identity-service" "keystone:identity-service"
 juju-add-relation "cinder:amqp" "rabbitmq-server:amqp"
 juju-add-relation "cinder:image-service" "glance:image-service"
