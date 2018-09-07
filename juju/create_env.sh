@@ -7,7 +7,7 @@ source "$my_dir/functions"
 
 # prepared image parameters
 image_user="root"
-base_image="/var/lib/libvirt/images/ubuntu-xenial.qcow2"
+base_image="/var/lib/libvirt/images/ubuntu-$SERIES.qcow2"
 
 trap 'catch_errors_ce $LINENO' ERR EXIT
 function catch_errors_ce() {
