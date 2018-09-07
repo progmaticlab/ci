@@ -107,7 +107,7 @@ if [[ "$SERIES" == 'bionic' ]]; then
     echo "INFO: apply DNS config for $mmch"
     res=1
     for i in 0 1 2 3 4 5 ; do
-      if juju-ssh $mmch "echo 'nameserver $addr.1' | sudo tee /usr/lib/systemd/resolv.conf ; sudo ln -sf /usr/lib/systemd/resolv.conf /etc/resolv.conf" ; then
+      if juju-ssh $mmch "echo 'nameserver $network_addr.1' | sudo tee /usr/lib/systemd/resolv.conf ; sudo ln -sf /usr/lib/systemd/resolv.conf /etc/resolv.conf" ; then
         res=0
         break
       fi
