@@ -102,7 +102,6 @@ juju-add-unit neutron-gateway --to $net3
 juju-deploy --series=xenial $my_dir/neutron-bgp
 
 echo "INFO: Add relations $(date)"
-juju-add-relation "nova-compute:shared-db" "mysql:shared-db"
 juju-add-relation "keystone:shared-db" "mysql:shared-db"
 juju-add-relation "glance:shared-db" "mysql:shared-db"
 juju-add-relation "cinder:shared-db" "mysql:shared-db"
