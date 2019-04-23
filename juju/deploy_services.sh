@@ -15,8 +15,8 @@ function catch_errors_ce() {
 
 pushd $WORKSPACE
 # clone own neutron-gateway charm due to inconsistent plugin list in it
-#rm -rf charm-neutron-gateway
-#git clone https://github.com/progmaticlab/charm-neutron-gateway.git
+rm -rf charm-neutron-gateway
+git clone https://github.com/progmaticlab/charm-neutron-gateway.git
 # clone own keystone charm due to updated policies for *_credential methods
 #rm -rf charm-keystone
 #git clone https://github.com/progmaticlab/charm-keystone.git
@@ -95,8 +95,8 @@ juju-expose neutron-api
 juju-deploy cs:$SERIES/neutron-openvswitch
 juju-set neutron-openvswitch "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 
-#juju-deploy --series=$SERIES $WORKSPACE/charm-neutron-gateway --to $net1
-juju-deploy cs:$SERIES/charm-neutron-gateway --to $net1
+juju-deploy --series=$SERIES $WORKSPACE/charm-neutron-gateway --to $net1
+#juju-deploy cs:$SERIES/charm-neutron-gateway --to $net1
 juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
