@@ -69,7 +69,7 @@ echo "INFO: creating environment $(date)"
 "$my_dir"/configure_openstack.sh
 
 # check openstack
-#"$my_dir"/check_openstack.sh
+"$my_dir"/check_openstack.sh
 
 # save logs
 $my_dir/save-logs.sh

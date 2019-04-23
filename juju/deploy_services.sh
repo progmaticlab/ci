@@ -53,9 +53,11 @@ juju-deploy cs:$SERIES/rabbitmq-server --to lxd:$cont0
 juju-deploy cs:$SERIES/percona-cluster mysql --to lxd:$cont0
 juju-set mysql "root-password=${PASSWORD:-password}" "max-connections=1500"
 
-#juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
-#juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
-#juju-expose openstack-dashboard
+if [[ "$SERIES" == 'xenial' ]]; then
+  juju-deploy cs:$SERIES/openstack-dashboard --to lxd:$cont0
+  juju-set openstack-dashboard "openstack-origin=$OPENSTACK_ORIGIN" "cinder-backup=True"
+  juju-expose openstack-dashboard
+fi
 
 juju-deploy cs:$SERIES/nova-cloud-controller --to lxd:$cont0
 juju-set nova-cloud-controller "console-access-protocol=novnc" "openstack-origin=$OPENSTACK_ORIGIN"
@@ -76,7 +78,8 @@ juju-expose cinder
 juju-deploy --series=$SERIES $my_dir/cinder-backup-s3
 juju-set cinder-backup-s3 "s3-url=http://ib.bizmrg.com"
 
-juju-deploy --series=$SERIES $WORKSPACE/charm-keystone --to lxd:$cont0
+#juju-deploy --series=$SERIES $WORKSPACE/charm-keystone --to lxd:$cont0
+juju-deploy cs:$SERIES/keystone --to lxd:$cont0
 juju-set keystone "admin-password=${PASSWORD:-password}" "admin-role=admin" "openstack-origin=$OPENSTACK_ORIGIN" "preferred-api-version=3"
 juju-expose keystone
 
@@ -92,7 +95,8 @@ juju-expose neutron-api
 juju-deploy cs:$SERIES/neutron-openvswitch
 juju-set neutron-openvswitch "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 
-juju-deploy --series=$SERIES $WORKSPACE/charm-neutron-gateway --to $net1
+#juju-deploy --series=$SERIES $WORKSPACE/charm-neutron-gateway --to $net1
+juju-deploy cs:$SERIES/charm-neutron-gateway --to $net1
 juju-set neutron-gateway "openstack-origin=$OPENSTACK_ORIGIN" "bridge-mappings=external:$brex_iface" "data-port=$brex_iface:$brex_port"
 juju-add-unit neutron-gateway --to $net2
 juju-add-unit neutron-gateway --to $net3
@@ -130,7 +134,9 @@ juju-add-relation "nova-compute:amqp" "rabbitmq-server:amqp"
 juju-add-relation "nova-cloud-controller:shared-db" "mysql:shared-db"
 juju-add-relation "nova-cloud-controller:amqp" "rabbitmq-server:amqp"
 juju-add-relation "nova-cloud-controller" "cinder"
-#juju-add-relation "openstack-dashboard:identity-service" "keystone:identity-service"
+if [[ "$SERIES" == 'xenial' ]]; then
+  juju-add-relation "openstack-dashboard:identity-service" "keystone:identity-service"
+fi
 juju-add-relation "cinder:identity-service" "keystone:identity-service"
 juju-add-relation "cinder:amqp" "rabbitmq-server:amqp"
 juju-add-relation "cinder:image-service" "glance:image-service"
@@ -155,9 +161,11 @@ juju-add-relation "neutron-openvswitch" "rabbitmq-server"
 
 post_deploy
 
-#juju-scp $HOME/files/forms.py openstack-dashboard/0:forms.py
-#juju-ssh openstack-dashboard/0 sudo cp -f ./forms.py /usr/share/openstack-dashboard/openstack_dashboard/dashboards/project/volumes/backups/
-#juju-ssh openstack-dashboard/0 sudo systemctl restart apache2.service
+if [[ "$SERIES" == 'xenial' ]]; then
+  juju-scp $HOME/files/forms.py openstack-dashboard/0:forms.py
+  juju-ssh openstack-dashboard/0 sudo cp -f ./forms.py /usr/share/openstack-dashboard/openstack_dashboard/dashboards/project/volumes/backups/
+  juju-ssh openstack-dashboard/0 sudo systemctl restart apache2.service
+fi
 
 # looks like that charms do not restart neutron services after config files were written
 restart_neutron $comp1
