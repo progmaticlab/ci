@@ -15,11 +15,11 @@ function catch_errors_ce() {
 
 pushd $WORKSPACE
 # clone own neutron-gateway charm due to inconsistent plugin list in it
-rm -rf charm-neutron-gateway
-git clone https://github.com/progmaticlab/charm-neutron-gateway.git
+#rm -rf charm-neutron-gateway
+#git clone https://github.com/progmaticlab/charm-neutron-gateway.git
 # clone own keystone charm due to updated policies for *_credential methods
-rm -rf charm-keystone
-git clone https://github.com/progmaticlab/charm-keystone.git
+#rm -rf charm-keystone
+#git clone https://github.com/progmaticlab/charm-keystone.git
 popd
 
 cont0_ip="$network_addr.$os_cont_0_idx"
